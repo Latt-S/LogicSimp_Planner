@@ -1,0 +1,2612 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบวางแผนการเรียน & คำนวณ GPAX ครบวงจร (Academic & GPA Planner)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Prompt, Sarabun & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Prompt', 'Sarabun', 'Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Prompt', 'Sarabun', 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        /* Course Card Animations */
+        .course-card {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .course-card:hover:not(.locked-card) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        @keyframes pulse-border {
+            0%, 100% { border-color: #ef4444; }
+            50% { border-color: #fca5a5; }
+        }
+        .conflict-card {
+            animation: pulse-border 2s infinite;
+        }
+        /* Grade Badges (Standard A-F) */
+        .grade-badge-A { background-color: #dcfce7; color: #166534; border-color: #86efac; }
+        .grade-badge-Bp { background-color: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+        .grade-badge-B { background-color: #e0f2fe; color: #075985; border-color: #7dd3fc; }
+        .grade-badge-Cp { background-color: #e0e7ff; color: #3730a3; border-color: #a5b4fc; }
+        .grade-badge-C { background-color: #fef3c7; color: #92400e; border-color: #fcd34d; }
+        .grade-badge-Dp { background-color: #ffedd5; color: #9a3412; border-color: #fdba74; }
+        .grade-badge-D { background-color: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+        .grade-badge-F { background-color: #fecdd3; color: #881337; border-color: #fda4af; }
+        .grade-badge-TBD { background-color: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+
+        /* Grade Badges (Non-GPA / Special) */
+        .grade-badge-S { background-color: #ccfbf1; color: #115e59; border-color: #5eead4; }
+        .grade-badge-U { background-color: #ffe4e6; color: #9f1239; border-color: #fda4af; }
+        .grade-badge-W { background-color: #e2e8f0; color: #334155; border-color: #94a3b8; }
+        .grade-badge-I { background-color: #fef9c3; color: #854d0e; border-color: #fde047; }
+        .grade-badge-P { background-color: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }
+        .grade-badge-AU { background-color: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
+
+        /* Hide number input arrows */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- ==================== UNIFIED TOP NAVIGATION BAR ==================== -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between py-3 gap-3">
+                <!-- App Brand / Logo -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white flex items-center justify-center shadow-md shadow-indigo-200 shrink-0">
+                            <i class="fa-solid fa-graduation-cap text-lg"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-base sm:text-lg font-bold text-slate-900 leading-tight">ระบบวางแผนการเรียน & คำนวณ GPA</h1>
+                            <p class="text-[11px] sm:text-xs text-slate-500">Academic Curriculum & Target GPAX Suite</p>
+                        </div>
+                    </div>
+                    <!-- Overall Curriculum GPAX Pill (if grades exist in curriculum) -->
+                    <div id="global-curr-gpax-mobile" class="md:hidden hidden bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-bold">
+                        GPAX แผน: <span class="curr-gpax-val">0.00</span>
+                    </div>
+                </div>
+
+                <!-- Main Module Switcher Tabs -->
+                <nav class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 shadow-inner w-full md:w-auto" aria-label="สลับโหมดการทำงาน">
+                    <button type="button" id="tab-btn-curriculum" onclick="switchMainTab('curriculum')" class="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition">
+                        <i class="fa-solid fa-diagram-project"></i>
+                        <span>วางแผนรายวิชา (Curriculum)</span>
+                    </button>
+                    <button type="button" id="tab-btn-gpa" onclick="switchMainTab('gpa')" class="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition">
+                        <i class="fa-solid fa-calculator"></i>
+                        <span>คำนวณ GPA & เป้าหมาย</span>
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- ======================================================================== -->
+    <!-- VIEW 1: CURRICULUM & PREREQUISITE PLANNER                                -->
+    <!-- ======================================================================== -->
+    <div id="view-curriculum" class="flex-1 flex flex-col">
+        <!-- Curriculum Sub-Toolbar -->
+        <div class="bg-white border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-3 shadow-xs">
+            <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3">
+                <!-- Left: Summary Badges -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="inline-flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium text-slate-700">
+                        <i class="fa-solid fa-layer-group text-indigo-600"></i>
+                        <span>หน่วยกิตในแผน:</span>
+                        <span id="currTotalCredits" class="text-sm sm:text-base font-bold text-indigo-700">0</span>
+                        <span class="text-xs text-slate-500">นก.</span>
+                    </div>
+                    <div id="currGradedSummaryBadge" class="hidden inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium text-emerald-800" title="คำนวณเฉพาะรายวิชาที่ได้เกรด A-F (ไม่รวม W, S, U, I, P, AU)">
+                        <i class="fa-solid fa-award text-emerald-600"></i>
+                        <span>GPAX สะสมในแผน:</span>
+                        <span id="currOverallGpax" class="text-sm sm:text-base font-bold text-emerald-700">0.00</span>
+                        <span id="currGradedCreditsText" class="text-[11px] text-emerald-600">(0 นก.)</span>
+                    </div>
+                    <div id="currSatisfactoryBadge" class="hidden inline-flex items-center gap-1.5 bg-teal-50 border border-teal-200 px-2.5 py-1.5 rounded-xl text-xs font-medium text-teal-800" title="หน่วยกิตที่ได้เกรด S (ผ่านแต่ไม่นำมาคิดเกรดเฉลี่ย)">
+                        <i class="fa-solid fa-circle-check text-teal-600"></i>
+                        <span>ผ่าน (S):</span>
+                        <span id="currSatisfactoryCredits" class="font-bold text-teal-700">0</span>
+                        <span class="text-[11px] text-teal-600">นก.</span>
+                    </div>
+                </div>
+
+                <!-- Right: Curriculum Controls -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- Add Course Button -->
+                    <button onclick="openCourseModal()" class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs sm:text-sm px-3.5 py-2 rounded-xl shadow-sm transition active:scale-95">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>เพิ่มรายวิชา</span>
+                    </button>
+
+                    <!-- View Mode Switcher -->
+                    <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-inner" role="group">
+                        <button type="button" id="viewGridBtn" onclick="setCurrViewMode('grid')" title="มุมมองตารางรายปี (Grid View)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition">
+                            <i class="fa-solid fa-table-columns"></i>
+                            <span class="hidden sm:inline">ตารางรายปี</span>
+                        </button>
+                        <button type="button" id="viewHorizontalBtn" onclick="setCurrViewMode('horizontal')" title="มุมมองแนวนอนเรียงตามเทอม" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition">
+                            <i class="fa-solid fa-bars-staggered"></i>
+                            <span class="hidden sm:inline">แนวนอนรายเทอม</span>
+                        </button>
+                    </div>
+
+                    <!-- Year Management -->
+                    <div class="inline-flex rounded-xl shadow-xs bg-white border border-slate-200 p-0.5">
+                        <button onclick="changeYearCount(-1)" title="ลดจำนวนปีการศึกษา" class="px-2 py-1.5 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-medium transition">
+                            <i class="fa-solid fa-minus"></i> ปี
+                        </button>
+                        <span id="yearCountDisplay" class="px-2.5 py-1.5 text-xs font-semibold text-slate-700 flex items-center border-x border-slate-100">
+                            4 ปี
+                        </span>
+                        <button onclick="changeYearCount(1)" title="เพิ่มจำนวนปีการศึกษา" class="px-2 py-1.5 text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg text-xs font-medium transition">
+                            <i class="fa-solid fa-plus"></i> ปี
+                        </button>
+                    </div>
+
+                    <!-- Toggle Summer Column -->
+                    <button onclick="toggleSummer()" id="toggleSummerBtn" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-2 rounded-xl transition">
+                        <i class="fa-solid fa-sun text-amber-500"></i>
+                        <span id="summerBtnText">ซ่อน Summer</span>
+                    </button>
+
+                    <!-- Data Menu Dropdown -->
+                    <div class="relative" id="dataMenuContainer">
+                        <button onclick="toggleDataMenu()" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-2 rounded-xl transition">
+                            <i class="fa-solid fa-database text-slate-500"></i>
+                            <span class="hidden sm:inline">จัดการข้อมูล</span>
+                            <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                        </button>
+                        <div id="dataMenuDropdown" class="hidden absolute right-0 mt-2 w-60 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-40 text-xs sm:text-sm">
+                            <button onclick="recalculateCurrAndNotify()" class="w-full text-left px-4 py-2 hover:bg-indigo-50 text-indigo-700 flex items-center gap-2.5 font-medium">
+                                <i class="fa-solid fa-wand-magic-sparkles w-4 text-center"></i> จัดตารางอัตโนมัติใหม่
+                            </button>
+                            <div class="border-t border-slate-100 my-1"></div>
+                            <button onclick="exportCurrJSON()" class="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 flex items-center gap-2.5">
+                                <i class="fa-solid fa-file-export w-4 text-center text-emerald-600"></i> ส่งออกไฟล์ (Export JSON)
+                            </button>
+                            <label class="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 flex items-center gap-2.5 cursor-pointer">
+                                <i class="fa-solid fa-file-import w-4 text-center text-blue-600"></i> นำเข้าไฟล์ (Import JSON)
+                                <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="importCurrJSON(event)">
+                            </label>
+                            <div class="border-t border-slate-100 my-1"></div>
+                            <button onclick="confirmLoadSampleCurr()" class="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 flex items-center gap-2.5">
+                                <i class="fa-solid fa-rotate-left w-4 text-center text-amber-600"></i> โหลดข้อมูลตัวอย่างวิศวะฯ
+                            </button>
+                            <button onclick="confirmClearAllCurr()" class="w-full text-left px-4 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2.5">
+                                <i class="fa-solid fa-trash-can w-4 text-center"></i> ล้างข้อมูลแผนการเรียน
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend / Status Bar -->
+        <div class="bg-slate-100/80 border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-2">
+            <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span class="font-medium text-slate-700"><i class="fa-solid fa-circle-info text-indigo-500 mr-1"></i>คำแนะนำ:</span>
+                    <span>คลิกการ์ดวิชาเพื่อแก้ไข/ใส่เกรด (รองรับ A-F และ W, S, U, I, P, AU)</span>
+                    <span class="flex items-center gap-1"><i class="fa-solid fa-lock text-amber-600"></i> ล็อก = ตรึงเทอมไว้ไม่ให้เลื่อนอัตโนมัติ</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> ขอบแดง = เงื่อนไขขัดแย้ง</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span>เทอมที่เปิดสอน:</span>
+                    <span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-medium">เทอม 1</span>
+                    <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">เทอม 2</span>
+                    <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">Summer</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Curriculum Grid Content -->
+        <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div id="gridContainer" class="space-y-8">
+                <!-- Years & Semesters rendered dynamically -->
+            </div>
+        </main>
+    </div>
+
+    <!-- ======================================================================== -->
+    <!-- VIEW 2: GPA & TARGET GPAX PLANNER                                        -->
+    <!-- ======================================================================== -->
+    <div id="view-gpa" class="hidden flex-1 flex flex-col">
+        <!-- GPA Sub-Toolbar & Bridge Banner -->
+        <div class="bg-indigo-50/70 border-b border-indigo-100 px-4 sm:px-6 lg:px-8 py-3">
+            <div class="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-2.5 text-xs sm:text-sm text-indigo-900">
+                    <span class="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-link text-xs"></i>
+                    </span>
+                    <div>
+                        <span class="font-semibold">เชื่อมต่อกับแผนการเรียน:</span>
+                        <span class="text-indigo-700 text-xs block sm:inline sm:ml-1">ดึงรายวิชาจากเทอมที่วางแผนไว้มาคำนวณเกรดได้ทันที</span>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <select id="import-term-selector" aria-label="เลือกชั้นปีและเทอมจากแผนการเรียน" class="rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 outline-none">
+                        <!-- Populated dynamically from Curriculum years/terms -->
+                    </select>
+                    <button type="button" onclick="importTermFromCurriculum()" class="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-cloud-arrow-down"></i> ดึงรายวิชาเทอมนี้
+                    </button>
+                    <button type="button" onclick="resetGpaData()" class="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-rose-600 hover:bg-rose-50 text-xs font-medium transition flex items-center gap-1">
+                        <i class="fa-solid fa-rotate-left"></i> ล้างค่า
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main GPA Content -->
+        <main class="flex-grow max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            
+            <!-- Top Summary Dashboard -->
+            <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <!-- Card 1: Current Semester GPA -->
+                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between relative overflow-hidden">
+                    <div class="z-10">
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">GPA เทอมปัจจุบัน</p>
+                        <div class="flex items-baseline gap-2">
+                            <span id="display-term-gpa" class="text-3xl sm:text-4xl font-bold text-slate-800">0.00</span>
+                            <span id="display-term-credits" class="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">0 หน่วยกิต</span>
+                        </div>
+                        <p id="term-gpa-note" class="text-xs text-slate-400 mt-1.5">คำนวณเฉพาะวิชาที่ระบุเกรด A-F แล้ว</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl shrink-0">
+                        <i class="fa-solid fa-book-open"></i>
+                    </div>
+                </div>
+
+                <!-- Card 2: Cumulative GPAX -->
+                <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-5 text-white shadow-md flex items-center justify-between relative overflow-hidden">
+                    <div class="z-10">
+                        <p class="text-xs font-medium text-blue-100 uppercase tracking-wider mb-1">เกรดเฉลี่ยสะสมรวม (GPAX)</p>
+                        <div class="flex items-baseline gap-2">
+                            <span id="display-gpax" class="text-3xl sm:text-4xl font-bold">0.00</span>
+                            <span id="display-total-credits" class="text-xs font-medium text-blue-100 bg-white/20 px-2 py-0.5 rounded-full">0 หน่วยกิต</span>
+                        </div>
+                        <p class="text-xs text-blue-100/90 mt-1.5">รวมเกรดสะสมเดิม + วิชาคิดเกรดเทอมนี้</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-white/15 text-white flex items-center justify-center text-xl backdrop-blur-sm shrink-0">
+                        <i class="fa-solid fa-award"></i>
+                    </div>
+                </div>
+
+                <!-- Card 3: Quick Grade Scale Reference -->
+                <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col justify-center">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-slate-600"><i class="fa-solid fa-scale-balanced text-indigo-500 mr-1.5"></i>เกณฑ์คะแนนมาตรฐาน</span>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1.5 text-center text-xs">
+                        <div class="bg-slate-50 rounded-lg py-1 px-1 border border-slate-100"><span class="font-bold text-emerald-700">A</span> = 4.0</div>
+                        <div class="bg-slate-50 rounded-lg py-1 px-1 border border-slate-100"><span class="font-bold text-teal-700">B+</span> = 3.5</div>
+                        <div class="bg-slate-50 rounded-lg py-1 px-1 border border-slate-100"><span class="font-bold text-sky-700">B</span> = 3.0</div>
+                        <div class="bg-slate-50 rounded-lg py-1 px-1 border border-slate-100"><span class="font-bold text-indigo-700">C+</span> = 2.5</div>
+                        <div class="bg-slate-50 rounded-lg py-1 px-1 border border-slate-100"><span class="font-bold text-amber-700">C</span> = 2.0</div>
+                        <div class="bg-slate-50 rounded-lg py-1 px-1 border border-slate-100"><span class="font-bold text-orange-700">D+</span> = 1.5</div>
+                        <div class="bg-slate-50 rounded-lg py-1 px-1 border border-slate-100"><span class="font-bold text-red-700">D</span> = 1.0</div>
+                        <div class="bg-slate-50 rounded-lg py-1 px-1 border border-slate-100"><span class="font-bold text-rose-800">F</span> = 0.0</div>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-2 text-center">
+                        <span class="font-semibold text-slate-600">S, U, W, I, P, AU</span> = ไม่นำหน่วยกิตมาหาร GPA
+                    </p>
+                </div>
+            </section>
+
+            <!-- Main Grid: Left (Inputs) & Right (Target Planner) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                <!-- Left Column (7 cols): Previous GPAX + Current Courses -->
+                <div class="lg:col-span-7 flex flex-col gap-6">
+                    
+                    <!-- Section 1: Quick Previous GPAX Input -->
+                    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                        <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-bold">1</span>
+                                <div>
+                                    <h2 class="text-base font-bold text-slate-800">ข้อมูลเกรดสะสมเดิม (GPAX เก่า)</h2>
+                                    <p class="text-xs text-slate-500">กรอกแบบรวดเร็วโดยไม่ต้องใส่รายวิชาเก่า</p>
+                                </div>
+                            </div>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="toggle-prev-gpa" class="sr-only peer" checked onchange="togglePrevGpaSection()">
+                                <div class="relative w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <span class="ms-2 text-xs font-medium text-slate-600 hidden sm:inline">นำมาคำนวณรวม</span>
+                            </label>
+                        </div>
+
+                        <div id="prev-gpa-inputs" class="p-4 sm:p-5 space-y-3 transition-all">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="prev-gpax" class="block text-xs font-semibold text-slate-700 mb-1.5">
+                                        เกรดเฉลี่ยสะสมเดิม (0.00 - 4.00)
+                                    </label>
+                                    <div class="relative">
+                                        <input type="number" id="prev-gpax" step="0.01" min="0" max="4" placeholder="เช่น 3.15" value=""
+                                            oninput="validateAndRecalculateGpa()"
+                                            class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition">
+                                        <span class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-medium">GPAX</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="prev-credits" class="block text-xs font-semibold text-slate-700 mb-1.5">
+                                        หน่วยกิตสะสมเดิมทั้งหมด (เฉพาะที่คิดเกรด)
+                                    </label>
+                                    <div class="relative">
+                                        <input type="number" id="prev-credits" step="0.5" min="0" max="300" placeholder="เช่น 60" value=""
+                                            oninput="validateAndRecalculateGpa()"
+                                            class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition">
+                                        <span class="absolute right-3.5 top-2.5 text-xs text-slate-400 font-medium">หน่วยกิต</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Current Semester Courses -->
+                    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                        <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">2</span>
+                                <div>
+                                    <h2 class="text-base font-bold text-slate-800">รายวิชาเทอมปัจจุบัน</h2>
+                                    <p class="text-xs text-slate-500">เลือกเกรด (A-F หรือ W, S, U, I, P, AU) หรือกด <i class="fa-solid fa-lock text-amber-500"></i> เพื่อล็อก</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button id="sync-back-btn" type="button" onclick="syncGradesBackToCurriculum()" class="hidden px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold transition flex items-center gap-1.5" title="บันทึกเกรดที่เลือกกลับไปยังแผนการเรียน">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> บันทึกเกรดกลับเข้าแผน
+                                </button>
+                                <button type="button" onclick="addGpaCourse()" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-xs sm:text-sm font-medium shadow-sm transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-plus"></i> เพิ่มรายวิชา
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Course Table Header (Desktop) -->
+                        <div class="hidden sm:grid sm:grid-cols-12 gap-2 px-5 py-2.5 bg-slate-50 border-b border-slate-200/70 text-xs font-semibold text-slate-500">
+                            <div class="col-span-5">ชื่อรายวิชา (ไม่บังคับ)</div>
+                            <div class="col-span-2 text-center">หน่วยกิต</div>
+                            <div class="col-span-3 text-center">เกรดที่ได้ / คาดหวัง</div>
+                            <div class="col-span-2 text-center">คงที่ / ลบ</div>
+                        </div>
+
+                        <!-- Course List Container -->
+                        <div id="gpa-courses-container" class="divide-y divide-slate-100">
+                            <!-- Dynamic course rows injected here -->
+                        </div>
+
+                        <!-- Empty State -->
+                        <div id="empty-gpa-courses-state" class="hidden p-8 text-center">
+                            <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3 text-lg">
+                                <i class="fa-solid fa-folder-open"></i>
+                            </div>
+                            <p class="text-sm font-medium text-slate-600">ยังไม่มีรายวิชาในเทอมนี้</p>
+                            <p class="text-xs text-slate-400 mt-1 mb-4">กดปุ่ม "เพิ่มรายวิชา" หรือ "ดึงรายวิชาเทอมนี้" จากด้านบน</p>
+                            <button type="button" onclick="addGpaCourse()" class="px-4 py-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 text-xs font-semibold transition">
+                                + เพิ่มรายวิชาแรก
+                            </button>
+                        </div>
+
+                        <!-- Footer Quick Add Bar -->
+                        <div class="p-3 sm:px-5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                            <span>จำนวนทั้งหมด <strong id="gpa-course-count-label" class="text-slate-700">0</strong> วิชา</span>
+                            <button type="button" onclick="addGpaCourse()" class="text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-circle-plus"></i> เพิ่มวิชาอีก
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right Column (5 cols): Target GPAX Solver -->
+                <div class="lg:col-span-5 flex flex-col gap-6 lg:sticky lg:top-24">
+                    <div class="bg-white rounded-2xl border border-indigo-200/80 shadow-md overflow-hidden">
+                        <div class="p-4 sm:p-5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-7 h-7 rounded-lg bg-white/20 text-white flex items-center justify-center text-sm font-bold backdrop-blur-sm">3</span>
+                                <div>
+                                    <h2 class="text-base font-bold">วางแผน & คำนวณเกรดขั้นต่ำ</h2>
+                                    <p class="text-xs text-indigo-100">หาเกรดขั้นต่ำ (A-F) ที่ต้องทำเพื่อให้ถึงเป้าหมาย</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-4 sm:p-5">
+                            <!-- Target GPAX Input -->
+                            <div class="mb-4">
+                                <label for="target-gpax" class="block text-xs font-semibold text-slate-700 mb-1.5">
+                                    เป้าหมายเกรดเฉลี่ยสะสม (Target GPAX) ที่ต้องการ
+                                </label>
+                                <div class="flex gap-2">
+                                    <div class="relative flex-grow">
+                                        <input type="number" id="target-gpax" step="0.01" min="0" max="4" placeholder="เช่น 3.25"
+                                            class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-base font-bold text-indigo-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
+                                        <span class="absolute right-3.5 top-3 text-xs text-slate-400 font-medium">/ 4.00</span>
+                                    </div>
+                                    <button type="button" onclick="solveMinimumGrades()" class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-sm font-semibold shadow-sm transition whitespace-nowrap flex items-center gap-1.5">
+                                        <i class="fa-solid fa-wand-magic-sparkles"></i> คำนวณ
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Quick Target Presets -->
+                            <div class="flex flex-wrap items-center gap-1.5 mb-5">
+                                <span class="text-[11px] text-slate-400 mr-1">เป้าหมายยอดนิยม:</span>
+                                <button type="button" onclick="setQuickTarget(2.00)" class="text-[11px] px-2 py-1 rounded-md bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 font-medium transition">2.00 (พ้นโปร)</button>
+                                <button type="button" onclick="setQuickTarget(2.50)" class="text-[11px] px-2 py-1 rounded-md bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 font-medium transition">2.50</button>
+                                <button type="button" onclick="setQuickTarget(3.00)" class="text-[11px] px-2 py-1 rounded-md bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 font-medium transition">3.00</button>
+                                <button type="button" onclick="setQuickTarget(3.25)" class="text-[11px] px-2 py-1 rounded-md bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 font-medium transition">3.25 (เกียรตินิยม 2)</button>
+                                <button type="button" onclick="setQuickTarget(3.50)" class="text-[11px] px-2 py-1 rounded-md bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 font-medium transition">3.50 (เกียรตินิยม 1)</button>
+                            </div>
+
+                            <!-- Helper Info Box -->
+                            <div class="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 mb-5 text-xs text-amber-800 flex items-start gap-2.5">
+                                <i class="fa-solid fa-lightbulb text-amber-500 mt-0.5 text-sm"></i>
+                                <div class="leading-relaxed">
+                                    <strong>เคล็ดลับ:</strong> หากวิชานี้ทราบเกรดแล้ว หรือเลือกเป็น <strong>W, S, U, I, P, AU</strong> ระบบจะไม่นำวิชานั้นมาคำนวณเกรดขั้นต่ำ และจะเฉลี่ยเกรดเฉพาะวิชาที่เหลือให้สมดุลที่สุด
+                                </div>
+                            </div>
+
+                            <!-- Solver Result Container -->
+                            <div id="solver-result-area" class="hidden border-t border-slate-100 pt-4">
+                                <!-- Injected dynamically by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 px-6 text-center text-xs text-slate-400">
+        ระบบบันทึกข้อมูลอัตโนมัติในเบราว์เซอร์ (Local Storage) • ออกแบบเพื่อการวางแผนการเรียนและคำนวณเกรดระดับมหาวิทยาลัย
+    </footer>
+
+    <!-- ==================== MODAL: ADD / EDIT CURRICULUM COURSE ==================== -->
+    <div id="courseModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 my-8">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <h2 id="modalTitle" class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-book-medical text-indigo-600"></i>
+                    <span>เพิ่มรายวิชาใหม่</span>
+                </h2>
+                <button type="button" onclick="closeCourseModal()" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-200/50 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Modal Form -->
+            <form id="courseForm" onsubmit="saveCurrCourse(event)" class="p-6 space-y-4">
+                <input type="hidden" id="courseId">
+
+                <!-- Error Alert Box inside Modal -->
+                <div id="modalErrorBox" class="hidden bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-sm flex items-start gap-2.5">
+                    <i class="fa-solid fa-triangle-exclamation mt-0.5 text-rose-600"></i>
+                    <span id="modalErrorText">เกิดข้อผิดพลาด</span>
+                </div>
+
+                <!-- Code, Credits & Optional Grade Row -->
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div class="sm:col-span-5">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">รหัสวิชา <span class="text-rose-500">*</span></label>
+                        <input type="text" id="courseCode" required placeholder="เช่น ME201" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm uppercase font-medium">
+                    </div>
+                    <div class="sm:col-span-3">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">หน่วยกิต <span class="text-rose-500">*</span></label>
+                        <input type="number" id="courseCredits" required min="0" max="12" step="0.5" value="3" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm">
+                    </div>
+                    <div class="sm:col-span-4">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">เกรด (ถ้ามี)</label>
+                        <select id="courseGrade" class="w-full px-2.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm font-medium">
+                            <option value="">ยังไม่ระบุ</option>
+                            <optgroup label="เกรดมาตรฐาน (คิด GPA)">
+                                <option value="4">A (4.0)</option>
+                                <option value="3.5">B+ (3.5)</option>
+                                <option value="3">B (3.0)</option>
+                                <option value="2.5">C+ (2.5)</option>
+                                <option value="2">C (2.0)</option>
+                                <option value="1.5">D+ (1.5)</option>
+                                <option value="1">D (1.0)</option>
+                                <option value="0">F (0.0)</option>
+                            </optgroup>
+                            <optgroup label="เกรดพิเศษ (ไม่คิด GPA)">
+                                <option value="S">S (ผ่าน)</option>
+                                <option value="U">U (ไม่ผ่าน)</option>
+                                <option value="W">W (ถอนรายวิชา)</option>
+                                <option value="I">I (ติด I / รอผล)</option>
+                                <option value="P">P (กำลังศึกษาต่อเนื่อง)</option>
+                                <option value="AU">AU (ร่วมฟัง / Audit)</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Course Name -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">ชื่อรายวิชา (Course Name) <span class="text-rose-500">*</span></label>
+                    <input type="text" id="courseName" required placeholder="เช่น Fluid Mechanics / กลศาสตร์ของไหล" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm">
+                </div>
+
+                <!-- Offered Terms -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">เทอมที่เปิดสอน (Offered Terms) <span class="text-rose-500">*</span></label>
+                    <div class="grid grid-cols-3 gap-2.5">
+                        <label class="cursor-pointer">
+                            <input type="checkbox" name="offeredTerms" value="1" checked class="peer sr-only">
+                            <div class="text-center py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-xs font-medium peer-checked:bg-sky-50 peer-checked:border-sky-500 peer-checked:text-sky-700 transition">
+                                <i class="fa-solid fa-check mr-1 opacity-0 peer-checked:opacity-100"></i>เทอม 1
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="checkbox" name="offeredTerms" value="2" checked class="peer sr-only">
+                            <div class="text-center py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-xs font-medium peer-checked:bg-emerald-50 peer-checked:border-emerald-500 peer-checked:text-emerald-700 transition">
+                                <i class="fa-solid fa-check mr-1 opacity-0 peer-checked:opacity-100"></i>เทอม 2
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="checkbox" name="offeredTerms" value="3" class="peer sr-only">
+                            <div class="text-center py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-xs font-medium peer-checked:bg-amber-50 peer-checked:border-amber-500 peer-checked:text-amber-700 transition">
+                                <i class="fa-solid fa-check mr-1 opacity-0 peer-checked:opacity-100"></i>Summer
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Target Semester Selection -->
+                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-semibold text-slate-700">ภาคการศึกษาที่ลงเรียน</label>
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-medium text-indigo-600">
+                            <input type="checkbox" id="autoScheduleCheck" onchange="toggleTargetSelects()" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <span>จัดลงเทอมที่เร็วที่สุดให้อัตโนมัติ</span>
+                        </label>
+                    </div>
+                    <div id="targetSelectGroup" class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] text-slate-500 mb-1">ชั้นปี</label>
+                            <select id="targetYear" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm outline-none focus:border-indigo-500">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-500 mb-1">เทอม</label>
+                            <select id="targetTerm" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm outline-none focus:border-indigo-500">
+                                <option value="1">เทอม 1</option>
+                                <option value="2">เทอม 2</option>
+                                <option value="3">Summer</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prerequisites Selection -->
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block text-xs font-semibold text-slate-700">วิชาบังคับก่อน (Prerequisites)</label>
+                        <span class="text-[11px] text-slate-400">เลือกได้มากกว่า 1 วิชา</span>
+                    </div>
+                    <div id="prereqListContainer" class="max-h-36 overflow-y-auto border border-slate-200 rounded-xl p-2 bg-slate-50/50 space-y-1 custom-scrollbar">
+                        <!-- Checkboxes populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Lock Status -->
+                <div class="flex items-center justify-between pt-1">
+                    <label class="inline-flex items-center gap-2.5 cursor-pointer select-none">
+                        <input type="checkbox" id="courseLocked" class="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300">
+                        <div>
+                            <span class="text-xs font-semibold text-slate-700 block"><i class="fa-solid fa-lock text-amber-600 mr-1"></i>ล็อกรายวิชานี้ (Lock Course)</span>
+                            <span class="text-[11px] text-slate-500 block">ตรึงวิชานี้ไว้ที่เทอมที่เลือก ไม่ให้ระบบเลื่อนอัตโนมัติ</span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Modal Footer Actions -->
+                <div class="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                    <button type="button" id="deleteCourseBtn" onclick="deleteCurrentCurrCourse()" class="hidden px-4 py-2.5 rounded-xl text-rose-600 hover:bg-rose-50 text-sm font-medium transition">
+                        <i class="fa-solid fa-trash-can mr-1"></i> ลบวิชา
+                    </button>
+                    <div class="flex items-center gap-2 ml-auto">
+                        <button type="button" onclick="closeCourseModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition">
+                            ยกเลิก
+                        </button>
+                        <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium shadow-sm transition">
+                            บันทึกข้อมูล
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL: CONFIRMATION DIALOG ==================== -->
+    <div id="confirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 border border-slate-200">
+            <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-4 text-xl">
+                <i class="fa-solid fa-circle-question"></i>
+            </div>
+            <h3 id="confirmTitle" class="text-base font-bold text-center text-slate-800 mb-2">ยืนยันการทำรายการ</h3>
+            <p id="confirmMessage" class="text-xs text-center text-slate-500 mb-6 leading-relaxed">คุณต้องการดำเนินการต่อหรือไม่?</p>
+            <div class="flex items-center gap-3">
+                <button type="button" onclick="closeConfirmModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition">
+                    ยกเลิก
+                </button>
+                <button type="button" id="confirmActionBtn" class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition">
+                    ยืนยัน
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unified Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full px-4 sm:px-0"></div>
+
+    <script>
+        /**
+         * ============================================================================
+         * UNIFIED APPLICATION STATE & CONSTANTS
+         * ============================================================================
+         */
+        const CURR_STORAGE_KEY = 'curriculum_planner_unified_v1';
+        const GPA_STORAGE_KEY = 'gpa_planner_unified_v1';
+
+        let activeMainTab = 'curriculum'; // 'curriculum' | 'gpa'
+
+        // --- State for Tab 1: Curriculum & Prerequisite Planner ---
+        let currState = {
+            numYears: 4,
+            showSummer: true,
+            viewMode: 'grid', // 'grid' | 'horizontal'
+            courses: []
+        };
+
+        const SAMPLE_CURR_COURSES = [
+            { id: 'c1', code: 'MATH101', name: 'Calculus I (แคลคูลัส 1)', credits: 3, year: 1, term: 1, prereqs: [], offered: [1, 2, 3], locked: false, grade: 3.5 },
+            { id: 'c2', code: 'PHYS101', name: 'General Physics I (ฟิสิกส์ทั่วไป 1)', credits: 3, year: 1, term: 1, prereqs: [], offered: [1, 2], locked: false, grade: 3.0 },
+            { id: 'c3', code: 'CHEM101', name: 'General Chemistry (เคมีทั่วไป)', credits: 3, year: 1, term: 1, prereqs: [], offered: [1], locked: false, grade: 3.0 },
+            { id: 'c4', code: 'ENG101', name: 'Engineering Drawing (เขียนแบบวิศวกรรม)', credits: 3, year: 1, term: 1, prereqs: [], offered: [1, 2], locked: true, grade: 4.0 },
+            
+            { id: 'c5', code: 'MATH102', name: 'Calculus II (แคลคูลัส 2)', credits: 3, year: 1, term: 2, prereqs: ['c1'], offered: [1, 2, 3], locked: false, grade: 3.0 },
+            { id: 'c6', code: 'PHYS102', name: 'General Physics II (ฟิสิกส์ทั่วไป 2)', credits: 3, year: 1, term: 2, prereqs: ['c2'], offered: [1, 2], locked: false, grade: 2.5 },
+            { id: 'c7', code: 'COMP101', name: 'Computer Programming (การเขียนโปรแกรม)', credits: 3, year: 1, term: 2, prereqs: [], offered: [1, 2], locked: false, grade: 4.0 },
+            
+            { id: 'c8', code: 'MATH201', name: 'Differential Equations (สมการเชิงอนุพันธ์)', credits: 3, year: 2, term: 1, prereqs: ['c5'], offered: [1, 2], locked: false, grade: null },
+            { id: 'c9', code: 'ME201', name: 'Engineering Mechanics: Statics (สถิตยศาสตร์)', credits: 3, year: 2, term: 1, prereqs: ['c2', 'c5'], offered: [1], locked: false, grade: null },
+            { id: 'c10', code: 'EE201', name: 'Basic Electrical Engineering (วิศวกรรมไฟฟ้าเบื้องต้น)', credits: 3, year: 2, term: 1, prereqs: ['c6'], offered: [1, 2], locked: false, grade: null },
+            
+            { id: 'c11', code: 'ME202', name: 'Mechanics of Materials (กลศาสตร์วัสดุ)', credits: 3, year: 2, term: 2, prereqs: ['c9'], offered: [2], locked: false, grade: null },
+            { id: 'c12', code: 'ME203', name: 'Thermodynamics (อุณหพลศาสตร์)', credits: 3, year: 2, term: 2, prereqs: ['c5', 'c6'], offered: [1, 2], locked: false, grade: null },
+            
+            { id: 'c13', code: 'ME301', name: 'Fluid Mechanics (กลศาสตร์ของไหล)', credits: 3, year: 3, term: 1, prereqs: ['c8', 'c9'], offered: [1], locked: false, grade: null },
+            { id: 'c14', code: 'ME302', name: 'Heat Transfer (การถ่ายเทความร้อน)', credits: 3, year: 3, term: 2, prereqs: ['c12', 'c13'], offered: [2], locked: false, grade: null }
+        ];
+
+        // --- Unified Grade Metadata (Standard A-F + Non-GPA S, U, W, I, P, AU) ---
+        const GRADE_OPTIONS = [
+            { key: '', label: 'ยังไม่ระบุ', value: null, short: '-', group: 'none', isGpa: false, earnsCredit: false, badgeClass: 'grade-badge-TBD' },
+            { key: '4', label: 'A (4.0)', value: 4.0, short: 'A', group: 'standard', isGpa: true, earnsCredit: true, badgeClass: 'grade-badge-A' },
+            { key: '3.5', label: 'B+ (3.5)', value: 3.5, short: 'B+', group: 'standard', isGpa: true, earnsCredit: true, badgeClass: 'grade-badge-Bp' },
+            { key: '3', label: 'B (3.0)', value: 3.0, short: 'B', group: 'standard', isGpa: true, earnsCredit: true, badgeClass: 'grade-badge-B' },
+            { key: '2.5', label: 'C+ (2.5)', value: 2.5, short: 'C+', group: 'standard', isGpa: true, earnsCredit: true, badgeClass: 'grade-badge-Cp' },
+            { key: '2', label: 'C (2.0)', value: 2.0, short: 'C', group: 'standard', isGpa: true, earnsCredit: true, badgeClass: 'grade-badge-C' },
+            { key: '1.5', label: 'D+ (1.5)', value: 1.5, short: 'D+', group: 'standard', isGpa: true, earnsCredit: true, badgeClass: 'grade-badge-Dp' },
+            { key: '1', label: 'D (1.0)', value: 1.0, short: 'D', group: 'standard', isGpa: true, earnsCredit: true, badgeClass: 'grade-badge-D' },
+            { key: '0', label: 'F (0.0)', value: 0.0, short: 'F', group: 'standard', isGpa: true, earnsCredit: false, badgeClass: 'grade-badge-F' },
+            { key: 'S', label: 'S (ผ่าน - ไม่คิดเกรด)', value: 'S', short: 'S', group: 'special', isGpa: false, earnsCredit: true, badgeClass: 'grade-badge-S' },
+            { key: 'U', label: 'U (ไม่ผ่าน - ไม่คิดเกรด)', value: 'U', short: 'U', group: 'special', isGpa: false, earnsCredit: false, badgeClass: 'grade-badge-U' },
+            { key: 'W', label: 'W (ถอนรายวิชา)', value: 'W', short: 'W', group: 'special', isGpa: false, earnsCredit: false, badgeClass: 'grade-badge-W' },
+            { key: 'I', label: 'I (ติด I / รอผล)', value: 'I', short: 'I', group: 'special', isGpa: false, earnsCredit: false, badgeClass: 'grade-badge-I' },
+            { key: 'P', label: 'P (กำลังศึกษาต่อเนื่อง)', value: 'P', short: 'P', group: 'special', isGpa: false, earnsCredit: false, badgeClass: 'grade-badge-P' },
+            { key: 'AU', label: 'AU (ร่วมฟัง / Audit)', value: 'AU', short: 'AU', group: 'special', isGpa: false, earnsCredit: false, badgeClass: 'grade-badge-AU' }
+        ];
+
+        const SOLVABLE_GRADES = [
+            { short: 'F', value: 0.0, badgeClass: 'grade-badge-F' },
+            { short: 'D', value: 1.0, badgeClass: 'grade-badge-D' },
+            { short: 'D+', value: 1.5, badgeClass: 'grade-badge-Dp' },
+            { short: 'C', value: 2.0, badgeClass: 'grade-badge-C' },
+            { short: 'C+', value: 2.5, badgeClass: 'grade-badge-Cp' },
+            { short: 'B', value: 3.0, badgeClass: 'grade-badge-B' },
+            { short: 'B+', value: 3.5, badgeClass: 'grade-badge-Bp' },
+            { short: 'A', value: 4.0, badgeClass: 'grade-badge-A' }
+        ];
+
+        let gpaCourses = [];
+        let lastRecommendedSolution = null;
+
+        function getGradeMeta(gradeVal) {
+            if (gradeVal === null || gradeVal === undefined || gradeVal === '') {
+                return GRADE_OPTIONS[0];
+            }
+            const strVal = String(gradeVal).trim().toUpperCase();
+            if (!isNaN(Number(strVal)) && strVal !== '') {
+                const numVal = Number(strVal);
+                return GRADE_OPTIONS.find(g => g.isGpa && g.value === numVal) || GRADE_OPTIONS[0];
+            }
+            return GRADE_OPTIONS.find(g => g.key === strVal) || GRADE_OPTIONS[0];
+        }
+
+        function parseRawGradeInput(rawVal) {
+            if (rawVal === null || rawVal === undefined || rawVal === '') return null;
+            const trimmed = String(rawVal).trim();
+            if (!isNaN(Number(trimmed)) && trimmed !== '') {
+                return parseFloat(trimmed);
+            }
+            return trimmed.toUpperCase();
+        }
+
+        /**
+         * ============================================================================
+         * INITIALIZATION & TAB SWITCHING
+         * ============================================================================
+         */
+        window.addEventListener('DOMContentLoaded', () => {
+            loadCurrState();
+            scheduleCourses();
+            renderCurrAll();
+
+            loadGpaState();
+            populateImportTermSelector();
+            renderGpaCourses();
+            recalculateGpaAll();
+
+            switchMainTab('curriculum');
+
+            // Close dropdowns when clicking outside
+            document.addEventListener('click', (e) => {
+                const menuContainer = document.getElementById('dataMenuContainer');
+                const dropdown = document.getElementById('dataMenuDropdown');
+                if (menuContainer && !menuContainer.contains(e.target)) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+        });
+
+        function switchMainTab(tabName) {
+            activeMainTab = tabName;
+            const currView = document.getElementById('view-curriculum');
+            const gpaView = document.getElementById('view-gpa');
+            const currBtn = document.getElementById('tab-btn-curriculum');
+            const gpaBtn = document.getElementById('tab-btn-gpa');
+
+            const activeBtnClass = 'flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white text-indigo-700 shadow-sm border border-slate-200/80 transition';
+            const inactiveBtnClass = 'flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 transition';
+
+            if (tabName === 'curriculum') {
+                currView.classList.remove('hidden');
+                gpaView.classList.add('hidden');
+                currBtn.className = activeBtnClass;
+                gpaBtn.className = inactiveBtnClass;
+                renderCurrAll();
+            } else {
+                currView.classList.add('hidden');
+                gpaView.classList.remove('hidden');
+                gpaBtn.className = activeBtnClass;
+                currBtn.className = inactiveBtnClass;
+                populateImportTermSelector();
+                renderGpaCourses();
+                recalculateGpaAll();
+            }
+        }
+
+        /**
+         * ============================================================================
+         * MODULE 1: CURRICULUM & PREREQUISITE PLANNER LOGIC
+         * ============================================================================
+         */
+        function loadCurrState() {
+            try {
+                const saved = localStorage.getItem(CURR_STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    currState.numYears = parsed.numYears || 4;
+                    currState.showSummer = parsed.showSummer !== undefined ? parsed.showSummer : true;
+                    currState.viewMode = parsed.viewMode === 'horizontal' ? 'horizontal' : 'grid';
+                    currState.courses = Array.isArray(parsed.courses) ? parsed.courses : [];
+                } else {
+                    currState.courses = JSON.parse(JSON.stringify(SAMPLE_CURR_COURSES));
+                    saveCurrState();
+                }
+            } catch (err) {
+                console.error('Error loading curriculum state:', err);
+                currState.courses = JSON.parse(JSON.stringify(SAMPLE_CURR_COURSES));
+            }
+        }
+
+        function saveCurrState() {
+            try {
+                localStorage.setItem(CURR_STORAGE_KEY, JSON.stringify(currState));
+            } catch (err) {
+                console.error('Error saving curriculum state:', err);
+            }
+        }
+
+        function toSlotIndex(year, term) {
+            return (year - 1) * 3 + (term - 1);
+        }
+
+        function fromSlotIndex(slotIndex) {
+            const safeSlot = Math.max(0, slotIndex);
+            const year = Math.floor(safeSlot / 3) + 1;
+            const term = (safeSlot % 3) + 1;
+            return { year, term };
+        }
+
+        function findEarliestOfferedSlot(minSlot, offeredTerms) {
+            if (!offeredTerms || offeredTerms.length === 0) return minSlot;
+            let slot = Math.max(0, minSlot);
+            for (let i = 0; i < 30; i++) {
+                const term = (slot % 3) + 1;
+                if (offeredTerms.includes(term)) {
+                    return slot;
+                }
+                slot++;
+            }
+            return minSlot;
+        }
+
+        function scheduleCourses() {
+            const courses = currState.courses;
+            const courseMap = new Map(courses.map(c => [c.id, c]));
+
+            courses.forEach(c => {
+                c.prereqs = c.prereqs.filter(pid => courseMap.has(pid));
+                c.conflicts = [];
+            });
+
+            const inDegree = new Map();
+            const dependents = new Map();
+
+            courses.forEach(c => {
+                inDegree.set(c.id, 0);
+                dependents.set(c.id, []);
+            });
+
+            courses.forEach(c => {
+                c.prereqs.forEach(pid => {
+                    dependents.get(pid).push(c.id);
+                    inDegree.set(c.id, inDegree.get(c.id) + 1);
+                });
+            });
+
+            const queue = [];
+            courses.forEach(c => {
+                if (inDegree.get(c.id) === 0) {
+                    queue.push(c.id);
+                }
+            });
+
+            const sortedOrder = [];
+            while (queue.length > 0) {
+                const currId = queue.shift();
+                sortedOrder.push(currId);
+                dependents.get(currId).forEach(depId => {
+                    inDegree.set(depId, inDegree.get(depId) - 1);
+                    if (inDegree.get(depId) === 0) {
+                        queue.push(depId);
+                    }
+                });
+            }
+
+            courses.forEach(c => {
+                if (!sortedOrder.includes(c.id)) sortedOrder.push(c.id);
+            });
+
+            let maxYearNeeded = currState.numYears;
+            let movedCount = 0;
+
+            sortedOrder.forEach(id => {
+                const course = courseMap.get(id);
+                const currentSlot = toSlotIndex(course.year, course.term);
+
+                let minRequiredSlot = 0;
+                const violatingPrereqs = [];
+
+                course.prereqs.forEach(pid => {
+                    const prereqCourse = courseMap.get(pid);
+                    const prereqSlot = toSlotIndex(prereqCourse.year, prereqCourse.term);
+                    if (prereqSlot + 1 > minRequiredSlot) {
+                        minRequiredSlot = prereqSlot + 1;
+                    }
+                    if (currentSlot <= prereqSlot) {
+                        violatingPrereqs.push(prereqCourse.code);
+                    }
+                });
+
+                if (course.locked) {
+                    if (violatingPrereqs.length > 0) {
+                        course.conflicts.push(`ต้องเรียนหลังวิชา: ${violatingPrereqs.join(', ')}`);
+                    }
+                    if (!course.offered.includes(course.term)) {
+                        const termNames = { 1: 'เทอม 1', 2: 'เทอม 2', 3: 'Summer' };
+                        course.conflicts.push(`ไม่ได้เปิดสอนใน${termNames[course.term]}`);
+                    }
+                } else {
+                    const candidateMinSlot = Math.max(currentSlot, minRequiredSlot);
+                    const validSlot = findEarliestOfferedSlot(candidateMinSlot, course.offered);
+
+                    if (validSlot !== currentSlot) {
+                        const newPos = fromSlotIndex(validSlot);
+                        course.year = newPos.year;
+                        course.term = newPos.term;
+                        movedCount++;
+                    }
+                }
+
+                if (course.year > maxYearNeeded) {
+                    maxYearNeeded = course.year;
+                }
+            });
+
+            if (maxYearNeeded > currState.numYears) {
+                currState.numYears = maxYearNeeded;
+            }
+
+            const hasSummerCourse = courses.some(c => c.term === 3);
+            if (hasSummerCourse && !currState.showSummer) {
+                currState.showSummer = true;
+            }
+
+            saveCurrState();
+            return movedCount;
+        }
+
+        function hasCircularDependency(courseId, proposedPrereqs) {
+            const visited = new Set();
+            const stack = [...proposedPrereqs];
+
+            while (stack.length > 0) {
+                const currId = stack.pop();
+                if (currId === courseId) return true;
+                if (!visited.has(currId)) {
+                    visited.add(currId);
+                    const c = currState.courses.find(item => item.id === currId);
+                    if (c && c.prereqs) {
+                        c.prereqs.forEach(p => stack.push(p));
+                    }
+                }
+            }
+            return false;
+        }
+
+        function renderCurrAll() {
+            updateCurrHeaderControls();
+            if (currState.viewMode === 'horizontal') {
+                renderHorizontalTimelineView();
+            } else {
+                renderSemesterGrid();
+            }
+            updateCurrCreditTotals();
+        }
+
+        function setCurrViewMode(mode) {
+            if (mode !== 'grid' && mode !== 'horizontal') return;
+            currState.viewMode = mode;
+            saveCurrState();
+            renderCurrAll();
+        }
+
+        function updateCurrHeaderControls() {
+            document.getElementById('yearCountDisplay').textContent = `${currState.numYears} ปี`;
+
+            const gridBtn = document.getElementById('viewGridBtn');
+            const horizBtn = document.getElementById('viewHorizontalBtn');
+            if (gridBtn && horizBtn) {
+                if (currState.viewMode === 'grid') {
+                    gridBtn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-indigo-700 shadow-sm border border-slate-200/80 transition';
+                    horizBtn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition';
+                } else {
+                    horizBtn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-indigo-700 shadow-sm border border-slate-200/80 transition';
+                    gridBtn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition';
+                }
+            }
+
+            const summerBtnText = document.getElementById('summerBtnText');
+            const toggleSummerBtn = document.getElementById('toggleSummerBtn');
+            if (currState.showSummer) {
+                summerBtnText.textContent = 'ซ่อน Summer';
+                toggleSummerBtn.classList.add('bg-amber-50', 'border-amber-200', 'text-amber-800');
+                toggleSummerBtn.classList.remove('bg-white', 'text-slate-700');
+            } else {
+                summerBtnText.textContent = 'แสดง Summer';
+                toggleSummerBtn.classList.remove('bg-amber-50', 'border-amber-200', 'text-amber-800');
+                toggleSummerBtn.classList.add('bg-white', 'text-slate-700');
+            }
+        }
+
+        function updateCurrCreditTotals() {
+            const total = currState.courses.reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
+            document.getElementById('currTotalCredits').textContent = total;
+
+            // Calculate GPAX of standard graded courses (A-F) and track S credits separately
+            let gradedCredits = 0;
+            let totalPoints = 0;
+            let satisfactoryCredits = 0;
+
+            currState.courses.forEach(c => {
+                const meta = getGradeMeta(c.grade);
+                const cred = Number(c.credits) || 0;
+                if (meta.isGpa) {
+                    gradedCredits += cred;
+                    totalPoints += cred * meta.value;
+                } else if (meta.key === 'S') {
+                    satisfactoryCredits += cred;
+                }
+            });
+
+            const desktopBadge = document.getElementById('currGradedSummaryBadge');
+            const mobileBadge = document.getElementById('global-curr-gpax-mobile');
+            if (gradedCredits > 0) {
+                const gpax = (totalPoints / gradedCredits).toFixed(2);
+                document.getElementById('currOverallGpax').textContent = gpax;
+                document.getElementById('currGradedCreditsText').textContent = `(${gradedCredits} นก. คิดเกรด)`;
+                desktopBadge.classList.remove('hidden');
+                mobileBadge.classList.remove('hidden');
+                mobileBadge.querySelector('.curr-gpax-val').textContent = gpax;
+            } else {
+                desktopBadge.classList.add('hidden');
+                mobileBadge.classList.add('hidden');
+            }
+
+            const sBadge = document.getElementById('currSatisfactoryBadge');
+            if (satisfactoryCredits > 0) {
+                document.getElementById('currSatisfactoryCredits').textContent = satisfactoryCredits;
+                sBadge.classList.remove('hidden');
+            } else {
+                sBadge.classList.add('hidden');
+            }
+        }
+
+        function getGradeBadgeInfo(gradeVal) {
+            const meta = getGradeMeta(gradeVal);
+            return meta.key === '' ? null : meta;
+        }
+
+        function renderSemesterGrid() {
+            const container = document.getElementById('gridContainer');
+            container.innerHTML = '';
+
+            const courseMap = new Map(currState.courses.map(c => [c.id, c]));
+            const termsToShow = currState.showSummer ? [1, 2, 3] : [1, 2];
+            const termMeta = {
+                1: { label: 'ภาคการศึกษาที่ 1 (เทอม 1)', badgeBg: 'bg-sky-100 text-sky-800', headerBg: 'bg-sky-50/70 border-sky-200' },
+                2: { label: 'ภาคการศึกษาที่ 2 (เทอม 2)', badgeBg: 'bg-emerald-100 text-emerald-800', headerBg: 'bg-emerald-50/70 border-emerald-200' },
+                3: { label: 'ภาคฤดูร้อน (Summer)', badgeBg: 'bg-amber-100 text-amber-800', headerBg: 'bg-amber-50/70 border-amber-200' }
+            };
+
+            for (let year = 1; year <= currState.numYears; year++) {
+                const yearCourses = currState.courses.filter(c => c.year === year);
+                const yearCredits = yearCourses.reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
+
+                const yearSection = document.createElement('section');
+                yearSection.className = 'bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden';
+
+                const yearHeader = document.createElement('div');
+                yearHeader.className = 'px-5 py-3.5 bg-slate-800 text-white flex items-center justify-between';
+                yearHeader.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <span class="bg-indigo-500 text-white text-xs font-bold px-2.5 py-1 rounded-lg">ปีที่ ${year}</span>
+                        <h2 class="font-semibold text-sm sm:text-base">ชั้นปีที่ ${year} (Year ${year})</h2>
+                    </div>
+                    <div class="text-xs sm:text-sm text-slate-300 font-medium">
+                        รวมชั้นปีนี้: <span class="text-white font-bold">${yearCredits}</span> หน่วยกิต
+                    </div>
+                `;
+                yearSection.appendChild(yearHeader);
+
+                const gridColsClass = currState.showSummer ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2';
+                const termsGrid = document.createElement('div');
+                termsGrid.className = `grid ${gridColsClass} divide-y lg:divide-y-0 lg:divide-x divide-slate-200`;
+
+                termsToShow.forEach(term => {
+                    const termCourses = yearCourses
+                        .filter(c => c.term === term)
+                        .sort((a, b) => a.code.localeCompare(b.code));
+                    const termCredits = termCourses.reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
+
+                    // Compute term GPA only for A-F courses
+                    let tGradedCred = 0, tPoints = 0;
+                    termCourses.forEach(c => {
+                        const meta = getGradeMeta(c.grade);
+                        if (meta.isGpa) {
+                            const cred = Number(c.credits) || 0;
+                            tGradedCred += cred;
+                            tPoints += cred * meta.value;
+                        }
+                    });
+                    const termGpaTag = tGradedCred > 0
+                        ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">GPA ${(tPoints / tGradedCred).toFixed(2)}</span>`
+                        : '';
+
+                    const termCol = document.createElement('div');
+                    termCol.className = 'flex flex-col min-h-[220px] bg-slate-50/30';
+
+                    termCol.innerHTML = `
+                        <div class="px-4 py-2.5 border-b ${termMeta[term].headerBg} flex items-center justify-between gap-2">
+                            <span class="text-xs font-bold text-slate-700 truncate">${termMeta[term].label}</span>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                ${termGpaTag}
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600">
+                                    ${termCredits} นก.
+                                </span>
+                                <button onclick="openCourseModal(null, ${year}, ${term})" title="เพิ่มวิชาลงในเทอมนี้" class="w-6 h-6 rounded-md bg-white hover:bg-indigo-600 text-slate-500 hover:text-white border border-slate-200 flex items-center justify-center text-xs transition">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+
+                    const cardsList = document.createElement('div');
+                    cardsList.className = 'p-3.5 space-y-3 flex-1';
+
+                    if (termCourses.length === 0) {
+                        cardsList.innerHTML = `
+                            <div onclick="openCourseModal(null, ${year}, ${term})" class="h-full min-h-[140px] border-2 border-dashed border-slate-200 hover:border-indigo-300 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-indigo-500 cursor-pointer transition p-4 text-center group">
+                                <i class="fa-solid fa-plus-circle text-xl mb-1.5 opacity-50 group-hover:opacity-100 transition"></i>
+                                <span class="text-xs font-medium">ไม่มีรายวิชาในเทอมนี้</span>
+                                <span class="text-[11px] opacity-75">คลิกเพื่อเพิ่มรายวิชา</span>
+                            </div>
+                        `;
+                    } else {
+                        termCourses.forEach(course => {
+                            cardsList.appendChild(createCourseCard(course, courseMap));
+                        });
+                    }
+
+                    termCol.appendChild(cardsList);
+                    termsGrid.appendChild(termCol);
+                });
+
+                yearSection.appendChild(termsGrid);
+                container.appendChild(yearSection);
+            }
+        }
+
+        function renderHorizontalTimelineView() {
+            const container = document.getElementById('gridContainer');
+            container.innerHTML = '';
+
+            const courseMap = new Map(currState.courses.map(c => [c.id, c]));
+            const termsToShow = currState.showSummer ? [1, 2, 3] : [1, 2];
+
+            const termStyle = {
+                1: { short: 'เทอม 1', badge: 'bg-sky-100 text-sky-800 border-sky-200', accent: 'border-l-sky-500' },
+                2: { short: 'เทอม 2', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200', accent: 'border-l-emerald-500' },
+                3: { short: 'Summer', badge: 'bg-amber-100 text-amber-800 border-amber-200', accent: 'border-l-amber-500' }
+            };
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-200';
+
+            const headerRow = document.createElement('div');
+            headerRow.className = 'bg-slate-800 text-white px-4 py-3 flex items-center justify-between text-xs font-semibold';
+            headerRow.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="w-40 sm:w-48 shrink-0 flex items-center gap-2">
+                        <i class="fa-solid fa-arrow-down-1-9 text-indigo-400"></i>
+                        <span>ลำดับเทอม (แกน Y)</span>
+                    </span>
+                    <span class="hidden sm:flex items-center gap-2 text-slate-300 border-l border-slate-600 pl-3">
+                        <i class="fa-solid fa-arrow-right-long text-indigo-400"></i>
+                        <span>รายวิชาในแต่ละเทอม (แกน X)</span>
+                    </span>
+                </div>
+                <span class="text-slate-300 font-normal hidden md:inline">คลิกที่กล่องวิชาเพื่อแก้ไข หรือกดแม่กุญแจเพื่อล็อก</span>
+            `;
+            wrapper.appendChild(headerRow);
+
+            let sequentialTermNumber = 0;
+
+            for (let year = 1; year <= currState.numYears; year++) {
+                termsToShow.forEach(term => {
+                    sequentialTermNumber++;
+                    const termCourses = currState.courses
+                        .filter(c => c.year === year && c.term === term)
+                        .sort((a, b) => a.code.localeCompare(b.code));
+                    const termCredits = termCourses.reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
+
+                    let tGradedCred = 0, tPoints = 0;
+                    termCourses.forEach(c => {
+                        const meta = getGradeMeta(c.grade);
+                        if (meta.isGpa) {
+                            const cred = Number(c.credits) || 0;
+                            tGradedCred += cred;
+                            tPoints += cred * meta.value;
+                        }
+                    });
+                    const termGpaBadge = tGradedCred > 0
+                        ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">GPA ${(tPoints / tGradedCred).toFixed(2)}</span>`
+                        : '';
+
+                    const row = document.createElement('div');
+                    row.className = `flex flex-col md:flex-row items-stretch hover:bg-slate-50/60 transition border-l-4 ${termStyle[term].accent}`;
+
+                    const yAxisCell = document.createElement('div');
+                    yAxisCell.className = 'w-full md:w-52 lg:w-56 shrink-0 bg-slate-50/90 md:border-r border-b md:border-b-0 border-slate-200 px-4 py-3 flex md:flex-col justify-between md:justify-center gap-1.5';
+                    yAxisCell.innerHTML = `
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-slate-800 text-white text-[11px] font-bold">
+                                เทอมที่ ${sequentialTermNumber}
+                            </span>
+                            <span class="text-xs font-bold px-2 py-0.5 rounded-md border ${termStyle[term].badge}">
+                                ปี ${year} • ${termStyle[term].short}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between gap-1.5 md:mt-1 text-xs text-slate-500">
+                            <span>${termCourses.length} วิชา</span>
+                            <div class="flex items-center gap-1">
+                                ${termGpaBadge}
+                                <span class="font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
+                                    ${termCredits} นก.
+                                </span>
+                            </div>
+                        </div>
+                    `;
+
+                    const xAxisCell = document.createElement('div');
+                    xAxisCell.className = 'flex-1 p-3 flex flex-wrap items-stretch gap-2.5';
+
+                    termCourses.forEach(course => {
+                        xAxisCell.appendChild(createCompactHorizontalCard(course, courseMap));
+                    });
+
+                    const addBox = document.createElement('button');
+                    addBox.type = 'button';
+                    addBox.onclick = () => openCourseModal(null, year, term);
+                    addBox.title = `เพิ่มรายวิชาลงใน ปี ${year} ${termStyle[term].short}`;
+                    addBox.className = 'min-w-[130px] min-h-[82px] px-3 py-2 rounded-xl border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40 text-slate-400 hover:text-indigo-600 flex flex-col items-center justify-center gap-1 transition cursor-pointer group';
+                    addBox.innerHTML = `
+                        <i class="fa-solid fa-plus text-sm group-hover:scale-110 transition"></i>
+                        <span class="text-[11px] font-medium">เพิ่มวิชา</span>
+                    `;
+                    xAxisCell.appendChild(addBox);
+
+                    row.appendChild(yAxisCell);
+                    row.appendChild(xAxisCell);
+                    wrapper.appendChild(row);
+                });
+            }
+
+            container.appendChild(wrapper);
+        }
+
+        function createCompactHorizontalCard(course, courseMap) {
+            const hasConflict = course.conflicts && course.conflicts.length > 0;
+            const gradeBadge = getGradeBadgeInfo(course.grade);
+            const isWithdrawn = gradeBadge && gradeBadge.key === 'W';
+            const box = document.createElement('div');
+
+            let borderClasses = 'border-slate-200 hover:border-indigo-400 bg-white';
+            if (hasConflict) {
+                borderClasses = 'border-2 border-rose-500 bg-rose-50/40 conflict-card';
+            } else if (course.locked) {
+                borderClasses = 'border-amber-300 bg-amber-50/30';
+            } else if (isWithdrawn) {
+                borderClasses = 'border-slate-200 bg-slate-50/80 opacity-80';
+            }
+
+            box.className = `course-card group relative w-full sm:w-[235px] rounded-xl border ${borderClasses} p-2.5 shadow-sm flex flex-col justify-between select-none ${course.locked ? 'locked-card cursor-default' : 'cursor-pointer'}`;
+
+            box.onclick = (e) => {
+                if (e.target.closest('.card-action-btn')) return;
+                if (course.locked) {
+                    showToast(`วิชา ${course.code} ถูกล็อกอยู่ กรุณาปลดล็อกก่อนแก้ไข`, 'warning');
+                    return;
+                }
+                openCourseModal(course.id);
+            };
+
+            let prereqHtml = '<span class="text-slate-400 text-[10px]">ไม่มีตัวก่อน</span>';
+            if (course.prereqs && course.prereqs.length > 0) {
+                prereqHtml = course.prereqs.map(pid => {
+                    const p = courseMap.get(pid);
+                    return p ? `<span class="inline-block bg-slate-100 text-slate-700 font-semibold px-1.5 py-0.2 rounded text-[10px] border border-slate-200">${escapeHtml(p.code)}</span>` : '';
+                }).join('');
+            }
+
+            const offeredBadges = [
+                { term: 1, label: '1', active: 'bg-sky-100 text-sky-700' },
+                { term: 2, label: '2', active: 'bg-emerald-100 text-emerald-700' },
+                { term: 3, label: 'S', active: 'bg-amber-100 text-amber-700' }
+            ].map(item => {
+                const isOffered = course.offered.includes(item.term);
+                return `<span class="w-4 h-4 inline-flex items-center justify-center rounded text-[9px] font-bold ${isOffered ? item.active : 'bg-slate-100 text-slate-300 line-through'}">${item.label}</span>`;
+            }).join('');
+
+            const gradeTagHtml = gradeBadge
+                ? `<span title="${escapeHtml(gradeBadge.label)}" class="text-[10px] font-bold px-1.5 py-0.2 rounded border ${gradeBadge.badgeClass} shrink-0">${gradeBadge.short}</span>`
+                : '';
+
+            const conflictBadge = hasConflict
+                ? `<div title="${escapeHtml(course.conflicts.join(' | '))}" class="mt-1.5 px-2 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-medium flex items-center gap-1 truncate">
+                       <i class="fa-solid fa-triangle-exclamation shrink-0"></i>
+                       <span class="truncate">${escapeHtml(course.conflicts[0])}</span>
+                   </div>`
+                : '';
+
+            box.innerHTML = `
+                <div>
+                    <div class="flex items-center justify-between gap-1">
+                        <div class="flex items-center gap-1 min-w-0">
+                            <span class="font-bold text-xs text-indigo-700 truncate">${escapeHtml(course.code)}</span>
+                            <span class="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 shrink-0">${course.credits} นก.</span>
+                            ${gradeTagHtml}
+                        </div>
+                        <div class="flex items-center gap-0.5 shrink-0">
+                            ${!course.locked ? `
+                            <button type="button" onclick="openCourseModal('${course.id}')" title="แก้ไขรายวิชา" class="card-action-btn w-6 h-6 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">
+                                <i class="fa-solid fa-pen text-[10px]"></i>
+                            </button>` : ''}
+                            <button type="button" onclick="toggleCurrLock('${course.id}')" title="${course.locked ? 'ปลดล็อกรายวิชา' : 'ล็อกรายวิชา'}" class="card-action-btn w-6 h-6 rounded-md flex items-center justify-center transition ${course.locked ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}">
+                                <i class="fa-solid ${course.locked ? 'fa-lock' : 'fa-lock-open'} text-[10px]"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-xs font-medium text-slate-800 mt-0.5 truncate" title="${escapeHtml(course.name)}">
+                        ${escapeHtml(course.name)}
+                    </div>
+                </div>
+
+                <div>
+                    <div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1">
+                        <div class="flex items-center gap-1 flex-wrap overflow-hidden">
+                            ${prereqHtml}
+                        </div>
+                        <div class="flex items-center gap-0.5 shrink-0" title="เทอมที่เปิดสอน (1, 2, Summer)">
+                            ${offeredBadges}
+                        </div>
+                    </div>
+                    ${conflictBadge}
+                </div>
+            `;
+
+            return box;
+        }
+
+        function createCourseCard(course, courseMap) {
+            const hasConflict = course.conflicts && course.conflicts.length > 0;
+            const gradeBadge = getGradeBadgeInfo(course.grade);
+            const isWithdrawn = gradeBadge && gradeBadge.key === 'W';
+            const card = document.createElement('div');
+            
+            let borderClasses = 'border-slate-200 hover:border-indigo-300';
+            let bgClasses = 'bg-white';
+            if (hasConflict) {
+                borderClasses = 'border-2 border-rose-500 conflict-card';
+                bgClasses = 'bg-rose-50/30';
+            } else if (course.locked) {
+                borderClasses = 'border-amber-300 bg-amber-50/20';
+            } else if (isWithdrawn) {
+                borderClasses = 'border-slate-200 opacity-80';
+                bgClasses = 'bg-slate-50/80';
+            }
+
+            card.className = `course-card relative rounded-xl border ${borderClasses} ${bgClasses} p-3.5 shadow-sm select-none ${course.locked ? 'locked-card cursor-default' : 'cursor-pointer'}`;
+            
+            card.onclick = (e) => {
+                if (e.target.closest('.lock-toggle-btn')) return;
+                if (course.locked) {
+                    showToast(`วิชา ${course.code} ถูกล็อกอยู่ กรุณาปลดล็อกก่อนแก้ไข`, 'warning');
+                    return;
+                }
+                openCourseModal(course.id);
+            };
+
+            let prereqHtml = '<span class="text-slate-400">ไม่มี</span>';
+            if (course.prereqs && course.prereqs.length > 0) {
+                prereqHtml = course.prereqs.map(pid => {
+                    const p = courseMap.get(pid);
+                    return p ? `<span class="inline-block bg-slate-100 text-slate-700 font-semibold px-1.5 py-0.5 rounded text-[11px] border border-slate-200">${escapeHtml(p.code)}</span>` : '';
+                }).join(' ');
+            }
+
+            const offeredBadges = [
+                { term: 1, label: '1', activeClass: 'bg-sky-100 text-sky-700 border-sky-200' },
+                { term: 2, label: '2', activeClass: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+                { term: 3, label: 'S', activeClass: 'bg-amber-100 text-amber-700 border-amber-200' }
+            ].map(item => {
+                const isOffered = course.offered.includes(item.term);
+                return `<span title="${item.term === 3 ? 'Summer' : 'เทอม ' + item.term}" class="w-5 h-5 inline-flex items-center justify-center rounded text-[10px] font-bold border ${isOffered ? item.activeClass : 'bg-slate-50 text-slate-300 border-slate-100 line-through'}">${item.label}</span>`;
+            }).join('');
+
+            const gradeTagHtml = gradeBadge
+                ? `<span title="${escapeHtml(gradeBadge.label)}" class="text-[11px] font-bold px-2 py-0.5 rounded-full border ${gradeBadge.badgeClass}">เกรด ${gradeBadge.short}</span>`
+                : '';
+
+            let conflictHtml = '';
+            if (hasConflict) {
+                conflictHtml = `
+                    <div class="mt-2.5 bg-rose-100 border border-rose-200 text-rose-800 px-2.5 py-1.5 rounded-lg text-[11px] font-medium flex items-start gap-1.5">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-600 mt-0.5 shrink-0"></i>
+                        <div>${course.conflicts.map(msg => `<div>${escapeHtml(msg)}</div>`).join('')}</div>
+                    </div>
+                `;
+            }
+
+            card.innerHTML = `
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="font-bold text-sm text-indigo-700 tracking-tight">${escapeHtml(course.code)}</span>
+                        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                            ${course.credits} หน่วยกิต
+                        </span>
+                        ${gradeTagHtml}
+                    </div>
+                    <button type="button" onclick="toggleCurrLock('${course.id}')" title="${course.locked ? 'ปลดล็อกรายวิชา' : 'ล็อกรายวิชาให้อยู่เทอมนี้'}" class="lock-toggle-btn w-7 h-7 rounded-lg flex items-center justify-center transition ${course.locked ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}">
+                        <i class="fa-solid ${course.locked ? 'fa-lock' : 'fa-lock-open'} text-xs"></i>
+                    </button>
+                </div>
+
+                <h3 class="text-xs sm:text-sm font-medium text-slate-800 mt-1 leading-snug line-clamp-2" title="${escapeHtml(course.name)}">
+                    ${escapeHtml(course.name)}
+                </h3>
+
+                <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 text-[11px]">
+                    <div class="flex items-center gap-1 flex-wrap">
+                        <span class="text-slate-400 shrink-0">วิชาบังคับก่อน:</span>
+                        ${prereqHtml}
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0" title="เทอมที่เปิดสอน (1, 2, Summer)">
+                        ${offeredBadges}
+                    </div>
+                </div>
+                ${conflictHtml}
+            `;
+
+            return card;
+        }
+
+        // --- Curriculum Modal & CRUD ---
+        function openCourseModal(courseId = null, defaultYear = 1, defaultTerm = 1) {
+            const modal = document.getElementById('courseModal');
+            const form = document.getElementById('courseForm');
+            const errorBox = document.getElementById('modalErrorBox');
+            const deleteBtn = document.getElementById('deleteCourseBtn');
+            const modalTitle = document.getElementById('modalTitle');
+
+            form.reset();
+            errorBox.classList.add('hidden');
+
+            const yearSelect = document.getElementById('targetYear');
+            yearSelect.innerHTML = '';
+            const maxOptionYears = Math.max(currState.numYears + 1, 6);
+            for (let y = 1; y <= maxOptionYears; y++) {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = `ปีที่ ${y}`;
+                yearSelect.appendChild(opt);
+            }
+
+            const prereqContainer = document.getElementById('prereqListContainer');
+            prereqContainer.innerHTML = '';
+            const otherCourses = currState.courses
+                .filter(c => c.id !== courseId)
+                .sort((a, b) => a.code.localeCompare(b.code));
+
+            if (otherCourses.length === 0) {
+                prereqContainer.innerHTML = '<div class="text-xs text-slate-400 text-center py-3">ยังไม่มีรายวิชาอื่นในระบบ</div>';
+            } else {
+                otherCourses.forEach(c => {
+                    const label = document.createElement('label');
+                    label.className = 'flex items-center gap-2.5 p-1.5 hover:bg-white rounded-lg cursor-pointer transition text-xs';
+                    label.innerHTML = `
+                        <input type="checkbox" name="prereqs" value="${c.id}" class="rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+                        <span class="font-bold text-slate-700 w-20 shrink-0">${escapeHtml(c.code)}</span>
+                        <span class="text-slate-600 truncate">${escapeHtml(c.name)}</span>
+                        <span class="ml-auto text-[10px] text-slate-400 shrink-0">ปี${c.year}/${c.term === 3 ? 'S' : c.term}</span>
+                    `;
+                    prereqContainer.appendChild(label);
+                });
+            }
+
+            if (courseId) {
+                const course = currState.courses.find(c => c.id === courseId);
+                if (!course) return;
+
+                const meta = getGradeMeta(course.grade);
+                modalTitle.innerHTML = `<i class="fa-solid fa-pen-to-square text-indigo-600"></i><span>แก้ไขรายวิชา: ${escapeHtml(course.code)}</span>`;
+                document.getElementById('courseId').value = course.id;
+                document.getElementById('courseCode').value = course.code;
+                document.getElementById('courseName').value = course.name;
+                document.getElementById('courseCredits').value = course.credits;
+                document.getElementById('courseGrade').value = meta.key;
+                document.getElementById('targetYear').value = course.year;
+                document.getElementById('targetTerm').value = course.term;
+                document.getElementById('courseLocked').checked = course.locked;
+                document.getElementById('autoScheduleCheck').checked = false;
+
+                document.querySelectorAll('input[name="offeredTerms"]').forEach(cb => {
+                    cb.checked = course.offered.includes(Number(cb.value));
+                });
+
+                document.querySelectorAll('input[name="prereqs"]').forEach(cb => {
+                    cb.checked = course.prereqs.includes(cb.value);
+                });
+
+                deleteBtn.classList.remove('hidden');
+            } else {
+                modalTitle.innerHTML = `<i class="fa-solid fa-book-medical text-indigo-600"></i><span>เพิ่มรายวิชาใหม่</span>`;
+                document.getElementById('courseId').value = '';
+                document.getElementById('courseGrade').value = '';
+                document.getElementById('targetYear').value = defaultYear;
+                document.getElementById('targetTerm').value = defaultTerm;
+                document.getElementById('autoScheduleCheck').checked = false;
+                deleteBtn.classList.add('hidden');
+            }
+
+            toggleTargetSelects();
+            modal.classList.remove('hidden');
+        }
+
+        function closeCourseModal() {
+            document.getElementById('courseModal').classList.add('hidden');
+        }
+
+        function toggleTargetSelects() {
+            const isAuto = document.getElementById('autoScheduleCheck').checked;
+            const group = document.getElementById('targetSelectGroup');
+            if (isAuto) {
+                group.classList.add('opacity-40', 'pointer-events-none');
+            } else {
+                group.classList.remove('opacity-40', 'pointer-events-none');
+            }
+        }
+
+        function showModalError(msg) {
+            const box = document.getElementById('modalErrorBox');
+            document.getElementById('modalErrorText').textContent = msg;
+            box.classList.remove('hidden');
+        }
+
+        function saveCurrCourse(e) {
+            e.preventDefault();
+            const id = document.getElementById('courseId').value || 'c_' + Date.now();
+            const code = document.getElementById('courseCode').value.trim().toUpperCase();
+            const name = document.getElementById('courseName').value.trim();
+            const credits = parseFloat(document.getElementById('courseCredits').value) || 0;
+            const grade = parseRawGradeInput(document.getElementById('courseGrade').value);
+            const locked = document.getElementById('courseLocked').checked;
+            const isAutoSchedule = document.getElementById('autoScheduleCheck').checked;
+
+            const offered = Array.from(document.querySelectorAll('input[name="offeredTerms"]:checked'))
+                .map(cb => Number(cb.value));
+
+            if (offered.length === 0) {
+                showModalError('กรุณาเลือกเทอมที่เปิดสอนอย่างน้อย 1 เทอม');
+                return;
+            }
+
+            const prereqs = Array.from(document.querySelectorAll('input[name="prereqs"]:checked'))
+                .map(cb => cb.value);
+
+            if (hasCircularDependency(id, prereqs)) {
+                showModalError('ไม่สามารถบันทึกได้ เนื่องจากเกิดเงื่อนไขวนซ้ำ (Circular Dependency) ระหว่างวิชาบังคับก่อน');
+                return;
+            }
+
+            const duplicate = currState.courses.find(c => c.code === code && c.id !== id);
+            if (duplicate) {
+                showModalError(`รหัสวิชา "${code}" มีอยู่ในแผนการเรียนแล้ว`);
+                return;
+            }
+
+            let year = parseInt(document.getElementById('targetYear').value, 10);
+            let term = parseInt(document.getElementById('targetTerm').value, 10);
+
+            if (isAutoSchedule) {
+                year = 1;
+                term = 1;
+            }
+
+            const existingIndex = currState.courses.findIndex(c => c.id === id);
+            const courseData = {
+                id,
+                code,
+                name,
+                credits,
+                grade,
+                year,
+                term,
+                prereqs,
+                offered,
+                locked,
+                conflicts: []
+            };
+
+            if (existingIndex >= 0) {
+                currState.courses[existingIndex] = courseData;
+            } else {
+                currState.courses.push(courseData);
+            }
+
+            const movedCount = scheduleCourses();
+            renderCurrAll();
+            closeCourseModal();
+
+            if (movedCount > 0) {
+                showToast(`บันทึกวิชา ${code} และเลื่อนวิชาที่เกี่ยวข้องอัตโนมัติ ${movedCount} รายการ`, 'info');
+            } else {
+                showToast(`บันทึกข้อมูลวิชา ${code} เรียบร้อยแล้ว`, 'success');
+            }
+        }
+
+        function deleteCurrentCurrCourse() {
+            const id = document.getElementById('courseId').value;
+            const course = currState.courses.find(c => c.id === id);
+            if (!course) return;
+
+            openConfirmModal(
+                'ยืนยันการลบรายวิชา',
+                `คุณต้องการลบวิชา "${course.code} - ${course.name}" ใช่หรือไม่? (วิชาที่ต้องผ่านวิชานี้จะถูกอัปเดตอัตโนมัติ)`,
+                () => {
+                    currState.courses = currState.courses.filter(c => c.id !== id);
+                    scheduleCourses();
+                    renderCurrAll();
+                    closeCourseModal();
+                    showToast(`ลบวิชา ${course.code} แล้ว`, 'success');
+                }
+            );
+        }
+
+        function toggleCurrLock(courseId) {
+            const course = currState.courses.find(c => c.id === courseId);
+            if (!course) return;
+
+            course.locked = !course.locked;
+            const movedCount = scheduleCourses();
+            renderCurrAll();
+
+            if (course.locked) {
+                showToast(`ล็อกวิชา ${course.code} ไว้ที่ ปี ${course.year} เทอม ${course.term === 3 ? 'Summer' : course.term}`, 'warning');
+            } else {
+                const extraMsg = movedCount > 0 ? ` (และปรับตารางอัตโนมัติ ${movedCount} วิชา)` : '';
+                showToast(`ปลดล็อกวิชา ${course.code} แล้ว${extraMsg}`, 'success');
+            }
+        }
+
+        function changeYearCount(delta) {
+            const newYears = currState.numYears + delta;
+            if (newYears < 1 || newYears > 8) {
+                showToast('จำนวนปีการศึกษาต้องอยู่ระหว่าง 1 ถึง 8 ปี', 'warning');
+                return;
+            }
+            if (delta < 0) {
+                const hasCoursesInLastYear = currState.courses.some(c => c.year > newYears);
+                if (hasCoursesInLastYear) {
+                    showToast(`ไม่สามารถลดปีได้ เนื่องจากยังมีรายวิชาอยู่ในปีที่ ${currState.numYears}`, 'error');
+                    return;
+                }
+            }
+            currState.numYears = newYears;
+            saveCurrState();
+            renderCurrAll();
+        }
+
+        function toggleSummer() {
+            if (currState.showSummer) {
+                const hasSummerCourses = currState.courses.some(c => c.term === 3);
+                if (hasSummerCourses) {
+                    showToast('ไม่สามารถซ่อน Summer ได้ เนื่องจากมีรายวิชาลงเรียนในภาคฤดูร้อน', 'warning');
+                    return;
+                }
+            }
+            currState.showSummer = !currState.showSummer;
+            saveCurrState();
+            renderCurrAll();
+        }
+
+        function toggleDataMenu() {
+            const dropdown = document.getElementById('dataMenuDropdown');
+            dropdown.classList.toggle('hidden');
+        }
+
+        function recalculateCurrAndNotify() {
+            document.getElementById('dataMenuDropdown').classList.add('hidden');
+            const moved = scheduleCourses();
+            renderCurrAll();
+            showToast(moved > 0 ? `จัดตารางใหม่เรียบร้อย (เลื่อน ${moved} วิชา)` : 'ตารางเรียนถูกต้องตามเงื่อนไขทั้งหมดแล้ว', 'success');
+        }
+
+        function exportCurrJSON() {
+            document.getElementById('dataMenuDropdown').classList.add('hidden');
+            const dataStr = JSON.stringify(currState, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `study-plan-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('ส่งออกไฟล์แผนการเรียนเรียบร้อยแล้ว', 'success');
+        }
+
+        function importCurrJSON(event) {
+            document.getElementById('dataMenuDropdown').classList.add('hidden');
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (!parsed || !Array.isArray(parsed.courses)) {
+                        throw new Error('รูปแบบไฟล์ไม่ถูกต้อง');
+                    }
+                    currState.numYears = parsed.numYears || 4;
+                    currState.showSummer = parsed.showSummer !== undefined ? parsed.showSummer : true;
+                    if (parsed.viewMode === 'grid' || parsed.viewMode === 'horizontal') {
+                        currState.viewMode = parsed.viewMode;
+                    }
+                    currState.courses = parsed.courses;
+                    scheduleCourses();
+                    renderCurrAll();
+                    showToast('นำเข้าแผนการเรียนเรียบร้อยแล้ว', 'success');
+                } catch (err) {
+                    showToast('ไฟล์ JSON ไม่ถูกต้อง ไม่สามารถนำเข้าได้', 'error');
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function confirmLoadSampleCurr() {
+            document.getElementById('dataMenuDropdown').classList.add('hidden');
+            openConfirmModal(
+                'โหลดข้อมูลตัวอย่าง',
+                'ข้อมูลปัจจุบันจะถูกแทนที่ด้วยข้อมูลตัวอย่างหลักสูตรวิศวกรรมศาสตร์ คุณต้องการดำเนินการต่อหรือไม่?',
+                () => {
+                    currState.numYears = 4;
+                    currState.showSummer = true;
+                    currState.courses = JSON.parse(JSON.stringify(SAMPLE_CURR_COURSES));
+                    scheduleCourses();
+                    renderCurrAll();
+                    showToast('โหลดข้อมูลตัวอย่างเรียบร้อยแล้ว', 'success');
+                }
+            );
+        }
+
+        function confirmClearAllCurr() {
+            document.getElementById('dataMenuDropdown').classList.add('hidden');
+            openConfirmModal(
+                'ล้างข้อมูลแผนการเรียน',
+                'รายวิชาทั้งหมดในตารางจะถูกลบออกอย่างถาวร คุณแน่ใจหรือไม่?',
+                () => {
+                    currState.courses = [];
+                    saveCurrState();
+                    renderCurrAll();
+                    showToast('ล้างข้อมูลแผนการเรียนเรียบร้อยแล้ว', 'info');
+                }
+            );
+        }
+
+        /**
+         * ============================================================================
+         * MODULE 2: GPA & TARGET GPAX PLANNER + CURRICULUM BRIDGE
+         * ============================================================================
+         */
+        function generateGpaId() {
+            return 'gpa_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function loadGpaState() {
+            try {
+                const saved = localStorage.getItem(GPA_STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    document.getElementById('prev-gpax').value = parsed.prevGpax ?? '';
+                    document.getElementById('prev-credits').value = parsed.prevCredits ?? '';
+                    document.getElementById('target-gpax').value = parsed.targetGpax ?? '';
+                    document.getElementById('toggle-prev-gpa').checked = parsed.usePrev !== undefined ? parsed.usePrev : true;
+                    gpaCourses = Array.isArray(parsed.courses) ? parsed.courses : [];
+                    togglePrevGpaSection(false);
+                } else {
+                    // Default sample state
+                    gpaCourses = [
+                        { id: generateGpaId(), currCourseId: null, name: 'วิชาเอกบังคับ 1', credits: 3, grade: 3.5, locked: true },
+                        { id: generateGpaId(), currCourseId: null, name: 'วิชาเอกบังคับ 2', credits: 3, grade: null, locked: false },
+                        { id: generateGpaId(), currCourseId: null, name: 'วิชาเลือกเสรี', credits: 3, grade: null, locked: false },
+                        { id: generateGpaId(), currCourseId: null, name: 'วิชาศึกษาทั่วไป', credits: 3, grade: 4.0, locked: true },
+                        { id: generateGpaId(), currCourseId: null, name: 'ปฏิบัติการ (Lab)', credits: 1, grade: null, locked: false }
+                    ];
+                    document.getElementById('prev-gpax').value = '2.95';
+                    document.getElementById('prev-credits').value = '45';
+                    document.getElementById('target-gpax').value = '3.10';
+                    saveGpaState();
+                }
+            } catch (e) {
+                console.error('Error loading GPA state:', e);
+            }
+        }
+
+        function saveGpaState() {
+            try {
+                const payload = {
+                    prevGpax: document.getElementById('prev-gpax').value,
+                    prevCredits: document.getElementById('prev-credits').value,
+                    targetGpax: document.getElementById('target-gpax').value,
+                    usePrev: document.getElementById('toggle-prev-gpa').checked,
+                    courses: gpaCourses
+                };
+                localStorage.setItem(GPA_STORAGE_KEY, JSON.stringify(payload));
+            } catch (e) {
+                console.error('Error saving GPA state:', e);
+            }
+        }
+
+        // Populate Year/Term dropdown in GPA tab from Curriculum Planner
+        function populateImportTermSelector() {
+            const select = document.getElementById('import-term-selector');
+            if (!select) return;
+            const prevVal = select.value;
+            select.innerHTML = '';
+
+            const terms = currState.showSummer ? [1, 2, 3] : [1, 2];
+            const termLabel = { 1: 'เทอม 1', 2: 'เทอม 2', 3: 'Summer' };
+
+            for (let y = 1; y <= currState.numYears; y++) {
+                terms.forEach(t => {
+                    const count = currState.courses.filter(c => c.year === y && c.term === t).length;
+                    const opt = document.createElement('option');
+                    opt.value = `${y}-${t}`;
+                    opt.textContent = `ปีที่ ${y} - ${termLabel[t]} (${count} วิชา)`;
+                    select.appendChild(opt);
+                });
+            }
+
+            if (prevVal && Array.from(select.options).some(o => o.value === prevVal)) {
+                select.value = prevVal;
+            }
+        }
+
+        // Import courses from selected Year & Term in Curriculum Planner, AND compute prior GPAX from earlier terms!
+        function importTermFromCurriculum() {
+            const select = document.getElementById('import-term-selector');
+            if (!select || !select.value) return;
+
+            const [yearStr, termStr] = select.value.split('-');
+            const targetYear = parseInt(yearStr, 10);
+            const targetTerm = parseInt(termStr, 10);
+            const targetSlot = toSlotIndex(targetYear, targetTerm);
+
+            const matchedCourses = currState.courses
+                .filter(c => c.year === targetYear && c.term === targetTerm)
+                .sort((a, b) => a.code.localeCompare(b.code));
+
+            if (matchedCourses.length === 0) {
+                showToast(`ไม่พบรายวิชาใน ปีที่ ${targetYear} ${targetTerm === 3 ? 'Summer' : 'เทอม ' + targetTerm}`, 'warning');
+                return;
+            }
+
+            // Map courses into GPA Planner (supports A-F as well as W, S, U, I, P, AU)
+            gpaCourses = matchedCourses.map(c => {
+                const meta = getGradeMeta(c.grade);
+                return {
+                    id: generateGpaId(),
+                    currCourseId: c.id,
+                    name: `${c.code} - ${c.name}`,
+                    credits: Number(c.credits) || 0,
+                    grade: meta.key === '' ? null : meta.value,
+                    locked: meta.key !== ''
+                };
+            });
+
+            // Check earlier terms in Curriculum Planner for standard graded courses (A-F) to auto-fill Previous GPAX
+            let priorCredits = 0;
+            let priorPoints = 0;
+            currState.courses.forEach(c => {
+                const slot = toSlotIndex(c.year, c.term);
+                const meta = getGradeMeta(c.grade);
+                if (slot < targetSlot && meta.isGpa) {
+                    const cred = Number(c.credits) || 0;
+                    priorCredits += cred;
+                    priorPoints += cred * meta.value;
+                }
+            });
+
+            let extraNotice = '';
+            if (priorCredits > 0) {
+                const priorGpax = (priorPoints / priorCredits).toFixed(2);
+                document.getElementById('toggle-prev-gpa').checked = true;
+                togglePrevGpaSection(false);
+                document.getElementById('prev-gpax').value = priorGpax;
+                document.getElementById('prev-credits').value = priorCredits;
+                extraNotice = ` และคำนวณ GPAX สะสมก่อนหน้า (${priorGpax} จาก ${priorCredits} นก.) ให้อัตโนมัติ`;
+            }
+
+            renderGpaCourses();
+            recalculateGpaAll();
+            clearSolverResult();
+            saveGpaState();
+            showToast(`ดึงรายวิชา ${matchedCourses.length} วิชาจาก ปีที่ ${targetYear} ${targetTerm === 3 ? 'Summer' : 'เทอม ' + targetTerm} สำเร็จ${extraNotice}`, 'success');
+        }
+
+        // Sync grades selected in GPA tab back into Curriculum Planner
+        function syncGradesBackToCurriculum() {
+            let updatedCount = 0;
+            gpaCourses.forEach(gc => {
+                if (gc.currCourseId) {
+                    const targetCurr = currState.courses.find(c => c.id === gc.currCourseId);
+                    if (targetCurr) {
+                        targetCurr.grade = gc.grade;
+                        updatedCount++;
+                    }
+                }
+            });
+
+            if (updatedCount > 0) {
+                saveCurrState();
+                updateCurrCreditTotals();
+                showToast(`อัปเดตเกรดกลับเข้าแผนการเรียนเรียบร้อย (${updatedCount} วิชา)`, 'success');
+            }
+        }
+
+        function addGpaCourse() {
+            gpaCourses.push({
+                id: generateGpaId(),
+                currCourseId: null,
+                name: '',
+                credits: 3,
+                grade: null,
+                locked: false
+            });
+            renderGpaCourses();
+            recalculateGpaAll();
+            clearSolverResult();
+            saveGpaState();
+        }
+
+        function removeGpaCourse(id) {
+            gpaCourses = gpaCourses.filter(c => c.id !== id);
+            renderGpaCourses();
+            recalculateGpaAll();
+            clearSolverResult();
+            saveGpaState();
+        }
+
+        function updateGpaCourseField(id, field, value) {
+            const course = gpaCourses.find(c => c.id === id);
+            if (!course) return;
+
+            if (field === 'name') {
+                course.name = value;
+            } else if (field === 'credits') {
+                let parsed = parseFloat(value);
+                if (isNaN(parsed) || parsed < 0) parsed = 0;
+                if (parsed > 20) parsed = 20;
+                course.credits = parsed;
+            } else if (field === 'grade') {
+                course.grade = parseRawGradeInput(value);
+                if (course.grade === null) {
+                    course.locked = false;
+                }
+            }
+
+            renderGpaCourses();
+            recalculateGpaAll();
+            clearSolverResult();
+            saveGpaState();
+        }
+
+        function toggleGpaLockCourse(id) {
+            const course = gpaCourses.find(c => c.id === id);
+            if (!course) return;
+
+            if (!course.locked) {
+                if (course.grade === null || course.grade === '') {
+                    course.grade = 3.0;
+                    showToast('กำหนดเกรดเริ่มต้นเป็น B (3.0) เพื่อล็อกเกรดคงที่', 'info');
+                }
+                course.locked = true;
+            } else {
+                course.locked = false;
+            }
+
+            renderGpaCourses();
+            recalculateGpaAll();
+            clearSolverResult();
+            saveGpaState();
+        }
+
+        function renderGpaCourses() {
+            const container = document.getElementById('gpa-courses-container');
+            const emptyState = document.getElementById('empty-gpa-courses-state');
+            const countLabel = document.getElementById('gpa-course-count-label');
+            const syncBackBtn = document.getElementById('sync-back-btn');
+
+            countLabel.textContent = gpaCourses.length;
+
+            // Show "Sync back to Curriculum" button if any linked course exists
+            const hasLinked = gpaCourses.some(c => c.currCourseId && currState.courses.some(cc => cc.id === c.currCourseId));
+            if (hasLinked) {
+                syncBackBtn.classList.remove('hidden');
+            } else {
+                syncBackBtn.classList.add('hidden');
+            }
+
+            if (gpaCourses.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            container.innerHTML = gpaCourses.map((course, index) => {
+                const gradeObj = getGradeMeta(course.grade);
+                const isSpecialNonGpa = gradeObj.key !== '' && !gradeObj.isGpa;
+                const rowBg = isSpecialNonGpa
+                    ? 'bg-slate-50/90'
+                    : (course.locked ? 'bg-amber-50/35' : 'bg-white hover:bg-slate-50/60');
+                const lockBtnStyle = course.locked 
+                    ? 'bg-amber-100 text-amber-700 border-amber-300 shadow-inner' 
+                    : 'bg-slate-100 text-slate-400 hover:text-slate-600 border-slate-200';
+
+                const standardOpts = GRADE_OPTIONS.filter(o => o.group === 'standard').map(opt => {
+                    const isSelected = (gradeObj.key === opt.key) ? 'selected' : '';
+                    return `<option value="${opt.key}" ${isSelected}>${opt.label}</option>`;
+                }).join('');
+
+                const specialOpts = GRADE_OPTIONS.filter(o => o.group === 'special').map(opt => {
+                    const isSelected = (gradeObj.key === opt.key) ? 'selected' : '';
+                    return `<option value="${opt.key}" ${isSelected}>${opt.label}</option>`;
+                }).join('');
+
+                const optionsHtml = `
+                    <option value="" ${gradeObj.key === '' ? 'selected' : ''}>ยังไม่ระบุ</option>
+                    <optgroup label="เกรดมาตรฐาน (คิด GPA)">${standardOpts}</optgroup>
+                    <optgroup label="เกรดพิเศษ (ไม่คิด GPA)">${specialOpts}</optgroup>
+                `;
+
+                return `
+                <div class="p-3.5 sm:px-5 sm:py-3 transition-colors ${rowBg}">
+                    <div class="grid grid-cols-12 gap-2.5 items-center">
+                        <!-- Course Name -->
+                        <div class="col-span-12 sm:col-span-5 flex items-center gap-2">
+                            <span class="text-xs font-semibold text-slate-400 w-5 text-right select-none">${index + 1}.</span>
+                            <input type="text" 
+                                value="${escapeHtml(course.name)}" 
+                                placeholder="ชื่อวิชา เช่น แคลคูลัส 1" 
+                                onchange="updateGpaCourseField('${course.id}', 'name', this.value)"
+                                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition">
+                        </div>
+
+                        <!-- Credits -->
+                        <div class="col-span-4 sm:col-span-2">
+                            <div class="relative flex items-center">
+                                <input type="number" 
+                                    step="0.5" min="0" max="20" 
+                                    value="${course.credits}" 
+                                    onchange="updateGpaCourseField('${course.id}', 'credits', this.value)"
+                                    aria-label="หน่วยกิต"
+                                    class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-center text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition">
+                                <span class="sm:hidden text-[10px] text-slate-400 ml-1">นก.</span>
+                            </div>
+                        </div>
+
+                        <!-- Grade Selector -->
+                        <div class="col-span-5 sm:col-span-3">
+                            <select onchange="updateGpaCourseField('${course.id}', 'grade', this.value)"
+                                aria-label="เลือกเกรด"
+                                class="w-full rounded-lg border px-2.5 py-1.5 text-sm font-semibold cursor-pointer outline-none transition ${gradeObj.badgeClass}">
+                                ${optionsHtml}
+                            </select>
+                        </div>
+
+                        <!-- Lock & Delete Actions -->
+                        <div class="col-span-3 sm:col-span-2 flex items-center justify-end sm:justify-center gap-1.5">
+                            <button type="button" 
+                                onclick="toggleGpaLockCourse('${course.id}')" 
+                                title="${course.locked ? 'ปลดล็อกเกรด (ให้ระบบคำนวณได้)' : 'ล็อกเกรดนี้ให้คงที่'}"
+                                class="w-8 h-8 rounded-lg border flex items-center justify-center text-xs transition ${lockBtnStyle}">
+                                <i class="fa-solid ${course.locked ? 'fa-lock' : 'fa-lock-open'}"></i>
+                            </button>
+                            <button type="button" 
+                                onclick="removeGpaCourse('${course.id}')" 
+                                title="ลบรายวิชานี้"
+                                class="w-8 h-8 rounded-lg border border-transparent text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center text-xs transition">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function togglePrevGpaSection(triggerRecalc = true) {
+            const isChecked = document.getElementById('toggle-prev-gpa').checked;
+            const inputsContainer = document.getElementById('prev-gpa-inputs');
+            if (isChecked) {
+                inputsContainer.classList.remove('opacity-40', 'pointer-events-none');
+            } else {
+                inputsContainer.classList.add('opacity-40', 'pointer-events-none');
+            }
+            if (triggerRecalc) {
+                recalculateGpaAll();
+                clearSolverResult();
+                saveGpaState();
+            }
+        }
+
+        function validateAndRecalculateGpa() {
+            const gpaxInput = document.getElementById('prev-gpax');
+            const creditsInput = document.getElementById('prev-credits');
+
+            if (gpaxInput.value !== '' && parseFloat(gpaxInput.value) > 4) {
+                gpaxInput.value = '4.00';
+            }
+            if (gpaxInput.value !== '' && parseFloat(gpaxInput.value) < 0) {
+                gpaxInput.value = '0.00';
+            }
+            if (creditsInput.value !== '' && parseFloat(creditsInput.value) < 0) {
+                creditsInput.value = '0';
+            }
+
+            recalculateGpaAll();
+            clearSolverResult();
+            saveGpaState();
+        }
+
+        function getPreviousData() {
+            const usePrev = document.getElementById('toggle-prev-gpa').checked;
+            if (!usePrev) return { prevGpax: 0, prevCredits: 0, prevPoints: 0 };
+
+            const prevGpax = parseFloat(document.getElementById('prev-gpax').value) || 0;
+            const prevCredits = parseFloat(document.getElementById('prev-credits').value) || 0;
+            return {
+                prevGpax,
+                prevCredits,
+                prevPoints: prevGpax * prevCredits
+            };
+        }
+
+        function recalculateGpaAll() {
+            let termCreditsGraded = 0;
+            let termPoints = 0;
+            let termTotalCreditsAll = 0;
+            let ungradedCount = 0;
+            let nonGpaCount = 0;
+
+            gpaCourses.forEach(c => {
+                const cred = parseFloat(c.credits) || 0;
+                const meta = getGradeMeta(c.grade);
+                termTotalCreditsAll += cred;
+
+                if (meta.isGpa) {
+                    termCreditsGraded += cred;
+                    termPoints += (cred * meta.value);
+                } else if (meta.key === '') {
+                    ungradedCount++;
+                } else {
+                    nonGpaCount++;
+                }
+            });
+
+            const termGpa = termCreditsGraded > 0 ? (termPoints / termCreditsGraded) : 0;
+
+            const { prevCredits, prevPoints } = getPreviousData();
+            const totalCredits = prevCredits + termCreditsGraded;
+            const totalPoints = prevPoints + termPoints;
+            const gpax = totalCredits > 0 ? (totalPoints / totalCredits) : 0;
+
+            document.getElementById('display-term-gpa').textContent = termGpa.toFixed(2);
+            document.getElementById('display-term-credits').textContent = `${termCreditsGraded} / ${termTotalCreditsAll} หน่วยกิต`;
+            
+            const noteEl = document.getElementById('term-gpa-note');
+            if (nonGpaCount > 0 && ungradedCount > 0) {
+                noteEl.textContent = `ไม่นำมาหาร: ยังไม่ระบุ ${ungradedCount} วิชา, เกรดพิเศษ (W/S/ฯลฯ) ${nonGpaCount} วิชา`;
+            } else if (nonGpaCount > 0) {
+                noteEl.textContent = `ไม่นำวิชาเกรดพิเศษ (W/S/ฯลฯ) ${nonGpaCount} วิชา มาคำนวณเกรดเฉลี่ย`;
+            } else if (ungradedCount > 0) {
+                noteEl.textContent = `มี ${ungradedCount} วิชาที่ยังไม่ระบุเกรด (ไม่นำมาหาร)`;
+            } else {
+                noteEl.textContent = `คำนวณครบทั้ง ${gpaCourses.length} รายวิชาแล้ว`;
+            }
+
+            document.getElementById('display-gpax').textContent = gpax.toFixed(2);
+            document.getElementById('display-total-credits').textContent = `${totalCredits} หน่วยกิต`;
+        }
+
+        // --- Target GPAX Solver ---
+        function setQuickTarget(val) {
+            document.getElementById('target-gpax').value = val.toFixed(2);
+            saveGpaState();
+            solveMinimumGrades();
+        }
+
+        function clearSolverResult() {
+            const resArea = document.getElementById('solver-result-area');
+            resArea.classList.add('hidden');
+            lastRecommendedSolution = null;
+        }
+
+        function solveMinimumGrades() {
+            const targetInput = document.getElementById('target-gpax');
+            const targetGpax = parseFloat(targetInput.value);
+            saveGpaState();
+
+            if (isNaN(targetGpax) || targetGpax < 0 || targetGpax > 4) {
+                showToast('กรุณาระบุเป้าหมาย GPAX ระหว่าง 0.00 ถึง 4.00', 'warning');
+                targetInput.focus();
+                return;
+            }
+
+            if (gpaCourses.length === 0) {
+                showToast('กรุณาเพิ่มรายวิชาในเทอมปัจจุบันอย่างน้อย 1 วิชา', 'warning');
+                return;
+            }
+
+            const { prevCredits, prevPoints } = getPreviousData();
+
+            let fixedCredits = prevCredits;
+            let fixedPoints = prevPoints;
+
+            const unlockedCourses = [];
+
+            gpaCourses.forEach((c, idx) => {
+                const cred = parseFloat(c.credits) || 0;
+                if (cred <= 0) return;
+
+                const meta = getGradeMeta(c.grade);
+
+                // Special non-GPA grades (W, S, U, I, P, AU) are excluded from GPA credits & solver
+                if (meta.key !== '' && !meta.isGpa) {
+                    return;
+                }
+
+                if (c.locked && meta.isGpa) {
+                    fixedCredits += cred;
+                    fixedPoints += (cred * meta.value);
+                } else {
+                    unlockedCourses.push({
+                        id: c.id,
+                        index: idx + 1,
+                        name: c.name.trim() || `วิชาที่ ${idx + 1}`,
+                        credits: cred,
+                        gradeIdx: 0
+                    });
+                }
+            });
+
+            const unlockedCreditsSum = unlockedCourses.reduce((sum, c) => sum + c.credits, 0);
+            const grandTotalCredits = fixedCredits + unlockedCreditsSum;
+
+            if (grandTotalCredits === 0) {
+                showToast('ไม่มีหน่วยกิตที่นำมาคิดเกรดเฉลี่ยได้ (ตรวจสอบหน่วยกิตหรือเกรด W/S)', 'warning');
+                return;
+            }
+
+            const calcCurrentGpax = () => {
+                let unlockedPoints = 0;
+                for (let u of unlockedCourses) {
+                    unlockedPoints += u.credits * SOLVABLE_GRADES[u.gradeIdx].value;
+                }
+                return (fixedPoints + unlockedPoints + 1e-9) / grandTotalCredits;
+            };
+
+            if (unlockedCourses.length === 0) {
+                const currentGpax = fixedPoints / fixedCredits;
+                renderSolverOutput({
+                    status: currentGpax >= targetGpax ? 'ALREADY_MET_LOCKED' : 'IMPOSSIBLE_LOCKED',
+                    targetGpax,
+                    projectedGpax: currentGpax,
+                    unlockedCourses: []
+                });
+                return;
+            }
+
+            if (calcCurrentGpax() >= targetGpax) {
+                renderSolverOutput({
+                    status: 'SUCCESS',
+                    targetGpax,
+                    projectedGpax: calcCurrentGpax(),
+                    unlockedCourses
+                });
+                return;
+            }
+
+            let maxPossiblePoints = fixedPoints + (unlockedCreditsSum * 4.0);
+            let maxPossibleGpax = maxPossiblePoints / grandTotalCredits;
+
+            if ((maxPossibleGpax + 1e-9) < targetGpax) {
+                unlockedCourses.forEach(u => u.gradeIdx = SOLVABLE_GRADES.length - 1);
+                renderSolverOutput({
+                    status: 'IMPOSSIBLE',
+                    targetGpax,
+                    projectedGpax: maxPossibleGpax,
+                    unlockedCourses
+                });
+                return;
+            }
+
+            // Balanced Greedy Step-Up Algorithm
+            while (calcCurrentGpax() < targetGpax) {
+                const upgradable = unlockedCourses.filter(u => u.gradeIdx < SOLVABLE_GRADES.length - 1);
+                if (upgradable.length === 0) break;
+
+                upgradable.sort((a, b) => {
+                    if (a.gradeIdx !== b.gradeIdx) {
+                        return a.gradeIdx - b.gradeIdx;
+                    }
+                    return b.credits - a.credits;
+                });
+
+                upgradable[0].gradeIdx += 1;
+            }
+
+            // Post-optimization trim
+            const sortedForTrim = [...unlockedCourses].sort((a, b) => {
+                if (b.gradeIdx !== a.gradeIdx) return b.gradeIdx - a.gradeIdx;
+                return b.credits - a.credits;
+            });
+
+            for (let u of sortedForTrim) {
+                while (u.gradeIdx > 0) {
+                    u.gradeIdx -= 1;
+                    if (calcCurrentGpax() < targetGpax) {
+                        u.gradeIdx += 1;
+                        break;
+                    }
+                }
+            }
+
+            renderSolverOutput({
+                status: 'SUCCESS',
+                targetGpax,
+                projectedGpax: calcCurrentGpax(),
+                unlockedCourses
+            });
+        }
+
+        function renderSolverOutput(result) {
+            const resArea = document.getElementById('solver-result-area');
+            resArea.classList.remove('hidden');
+            lastRecommendedSolution = result.unlockedCourses;
+
+            let html = '';
+
+            if (result.status === 'IMPOSSIBLE' || result.status === 'IMPOSSIBLE_LOCKED') {
+                html += `
+                    <div class="bg-rose-50 border border-rose-200 rounded-xl p-3.5 mb-4">
+                        <div class="flex items-start gap-2.5">
+                            <i class="fa-solid fa-circle-xmark text-rose-600 mt-0.5 text-base"></i>
+                            <div>
+                                <h3 class="text-sm font-bold text-rose-800">ไม่สามารถทำถึงเป้าหมาย ${result.targetGpax.toFixed(2)} ได้ในเทอมนี้</h3>
+                                <p class="text-xs text-rose-700 mt-1 leading-relaxed">
+                                    ${result.status === 'IMPOSSIBLE_LOCKED' 
+                                        ? 'เนื่องจากไม่มีวิชาคิดเกรดที่ปรับเปลี่ยนได้แล้ว ทำให้ได้ GPAX สูงสุดเพียง' 
+                                        : 'แม้ว่าจะทำเกรด <strong>A (4.0)</strong> ทุกวิชาที่เหลือ เกรดเฉลี่ยสะสมสูงสุดที่เป็นไปได้คือ'} 
+                                    <span class="inline-block px-1.5 py-0.5 bg-rose-600 text-white font-bold rounded text-xs ml-0.5">${result.projectedGpax.toFixed(2)}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (result.status === 'ALREADY_MET_LOCKED') {
+                html += `
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5">
+                        <div class="flex items-start gap-2.5">
+                            <i class="fa-solid fa-circle-check text-emerald-600 mt-0.5 text-base"></i>
+                            <div>
+                                <h3 class="text-sm font-bold text-emerald-800">บรรลุเป้าหมายเรียบร้อยแล้ว!</h3>
+                                <p class="text-xs text-emerald-700 mt-1">
+                                    เกรดที่มีอยู่ให้ค่า GPAX รวมอยู่ที่ <strong>${result.projectedGpax.toFixed(2)}</strong> ซึ่งถึงเป้าหมาย (${result.targetGpax.toFixed(2)}) แล้ว
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 mb-4">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                                <i class="fa-solid fa-circle-check text-emerald-600"></i> พบแผนเกรดขั้นต่ำที่เหมาะสม!
+                            </span>
+                            <span class="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                GPAX คาดการณ์: ${result.projectedGpax.toFixed(2)}
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-emerald-700">เกรดขั้นต่ำที่แนะนำสำหรับวิชาที่คิดเกรดและไม่ได้ล็อก:</p>
+                    </div>
+                `;
+            }
+
+            if (result.unlockedCourses.length > 0) {
+                html += `<div class="space-y-2 mb-4 max-h-64 overflow-y-auto pr-1 custom-scrollbar">`;
+                result.unlockedCourses.forEach(u => {
+                    const gradeInfo = SOLVABLE_GRADES[u.gradeIdx];
+                    html += `
+                        <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
+                            <div class="min-w-0 pr-2">
+                                <p class="text-xs font-bold text-slate-800 truncate">${escapeHtml(u.name)}</p>
+                                <p class="text-[11px] text-slate-500">${u.credits} หน่วยกิต</p>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <span class="text-[11px] text-slate-400">ขั้นต่ำ:</span>
+                                <span class="w-9 h-8 rounded-lg border font-bold text-sm flex items-center justify-center shadow-sm ${gradeInfo.badgeClass}">
+                                    ${gradeInfo.short}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+
+                html += `
+                    <button type="button" onclick="applyRecommendedGrades()" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 active:scale-[0.99] text-white text-xs sm:text-sm font-semibold shadow-sm transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-check-double text-emerald-400"></i> นำเกรดแนะนำนี้ไปใส่ในตารางวิชา
+                    </button>
+                `;
+            }
+
+            resArea.innerHTML = html;
+        }
+
+        function applyRecommendedGrades() {
+            if (!lastRecommendedSolution || lastRecommendedSolution.length === 0) return;
+
+            lastRecommendedSolution.forEach(rec => {
+                const course = gpaCourses.find(c => c.id === rec.id);
+                const meta = course ? getGradeMeta(course.grade) : null;
+                if (course && !course.locked && (meta.key === '' || meta.isGpa)) {
+                    course.grade = SOLVABLE_GRADES[rec.gradeIdx].value;
+                }
+            });
+
+            renderGpaCourses();
+            recalculateGpaAll();
+            saveGpaState();
+            showToast('นำเกรดแนะนำใส่ลงในรายวิชาเรียบร้อยแล้ว!', 'success');
+        }
+
+        function resetGpaData() {
+            openConfirmModal(
+                'ล้างข้อมูลการคำนวณ GPA',
+                'คุณต้องการล้างข้อมูลเกรดสะสมเดิมและรายวิชาในหน้าคำนวณ GPA ทั้งหมดหรือไม่?',
+                () => {
+                    document.getElementById('prev-gpax').value = '';
+                    document.getElementById('prev-credits').value = '';
+                    document.getElementById('target-gpax').value = '';
+                    document.getElementById('toggle-prev-gpa').checked = true;
+                    togglePrevGpaSection(false);
+
+                    gpaCourses = [
+                        { id: generateGpaId(), currCourseId: null, name: '', credits: 3, grade: null, locked: false },
+                        { id: generateGpaId(), currCourseId: null, name: '', credits: 3, grade: null, locked: false },
+                        { id: generateGpaId(), currCourseId: null, name: '', credits: 3, grade: null, locked: false }
+                    ];
+
+                    renderGpaCourses();
+                    recalculateGpaAll();
+                    clearSolverResult();
+                    saveGpaState();
+                    showToast('ล้างข้อมูลการคำนวณ GPA เรียบร้อยแล้ว', 'info');
+                }
+            );
+        }
+
+        /**
+         * ============================================================================
+         * SHARED UTILITIES (CONFIRMATION MODAL, TOASTS & ESCAPE)
+         * ============================================================================
+         */
+        let pendingConfirmCallback = null;
+        function openConfirmModal(title, message, onConfirm) {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmMessage').textContent = message;
+            pendingConfirmCallback = onConfirm;
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+            pendingConfirmCallback = null;
+        }
+
+        document.getElementById('confirmActionBtn').onclick = () => {
+            if (pendingConfirmCallback) pendingConfirmCallback();
+            closeConfirmModal();
+        };
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const styles = {
+                success: 'bg-emerald-600 text-white',
+                error: 'bg-rose-600 text-white',
+                warning: 'bg-amber-600 text-white',
+                info: 'bg-slate-800 text-white'
+            };
+            const icons = {
+                success: 'fa-circle-check',
+                error: 'fa-circle-xmark',
+                warning: 'fa-triangle-exclamation',
+                info: 'fa-circle-info'
+            };
+
+            toast.className = `${styles[type] || styles.info} px-4 py-3 rounded-xl shadow-lg text-xs sm:text-sm font-medium flex items-center gap-2.5 pointer-events-auto transform transition-all duration-300 translate-y-2 opacity-0`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type]} text-base"></i><span>${escapeHtml(message)}</span>`;
+            
+            container.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        function escapeHtml(str) {
+            if (typeof str !== 'string') return str || '';
+            return str.replace(/[&<>"']/g, m => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[m]));
+        }
+    </script>
+</body>
+</html>
